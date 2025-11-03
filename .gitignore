@@ -1,0 +1,15 @@
+# Inference run directories (including numbered versions like 1inference_run, 2inference_run)
+*inference_run*/
+
+# Model directories (including numbered versions)
+models*/
+
+# Videos directories (including numbered versions like 1videos, 2videos)
+*videos*/
+
+# Large data files
+**/data/*.pkl
+**/data/*.pickle
+
+# Large notebooks (over 50MB)
+**/plotting_jupyter_*.ipynb

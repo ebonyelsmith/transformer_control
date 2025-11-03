@@ -1,0 +1,45 @@
+{
+  "epoch": 1,
+  "step": 5000,
+  "checkpoint_path": "cartpole/models/cartpole_cos_sin_theta/ebonye_models/checkpoint_epoch1_step5000.pt",
+  "run_path": "cartpole/models/cartpole_cos_sin_theta/ebonye_models",
+  "system": "cartpole",
+  "model_config": {
+    "family": "gpt2",
+    "n_dims": 5,
+    "n_embd": 256,
+    "n_head": 8,
+    "n_layer": 12,
+    "n_positions": 1024
+  },
+  "training_config": {
+    "batch_size": 3000,
+    "curriculum": {
+      "dims": {
+        "end": 2,
+        "inc": 1,
+        "interval": 200000000000,
+        "start": 2
+      },
+      "points": {
+        "end": 1000,
+        "inc": 1,
+        "interval": 2000000000000,
+        "start": 560
+      }
+    },
+    "data": "gaussian",
+    "epochs": 1,
+    "keep_every_steps": 5000,
+    "learning_rate": 0.0001,
+    "num_tasks": null,
+    "num_training_examples": null,
+    "resume_id": null,
+    "save_every_steps": 5000,
+    "task": "linear_regression",
+    "task_kwargs": {},
+    "test_pendulums": 1,
+    "test_pendulums_outofdistr": 1,
+    "train_steps": 6400
+  }
+}

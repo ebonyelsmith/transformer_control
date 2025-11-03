@@ -1,0 +1,79 @@
+{
+  "system_type": "cartpole",
+  "checkpoint_step": 40000,
+  "epoch": 1,
+  "num_systems": 10,
+  "contexts": [
+    1,
+    10,
+    20,
+    30,
+    40,
+    50
+  ],
+  "seed": 1000,
+  "selected_indices": [
+    1013,
+    2827,
+    2369,
+    846,
+    1699,
+    2418,
+    10,
+    2027,
+    147,
+    146
+  ],
+  "system_params": {
+    "1013": {
+      "cartmass": 2.0,
+      "polemass": 0.3661926163293422,
+      "polelength": 1.4853496623803821
+    },
+    "2827": {
+      "cartmass": 2.0,
+      "polemass": 0.818886063401441,
+      "polelength": 1.3253950635513987
+    },
+    "2369": {
+      "cartmass": 2.0,
+      "polemass": 0.7861942146941951,
+      "polelength": 1.05070727844985
+    },
+    "846": {
+      "cartmass": 2.0,
+      "polemass": 0.845531186618024,
+      "polelength": 1.4656534160181074
+    },
+    "1699": {
+      "cartmass": 2.0,
+      "polemass": 0.46563026140205316,
+      "polelength": 1.1545550668277786
+    },
+    "2418": {
+      "cartmass": 2.0,
+      "polemass": 0.54521993158463,
+      "polelength": 1.0281378677836959
+    },
+    "10": {
+      "cartmass": 2.0,
+      "polemass": 0.7998019403686856,
+      "polelength": 1.3441846584782988
+    },
+    "2027": {
+      "cartmass": 2.0,
+      "polemass": 0.81121925628091,
+      "polelength": 1.0031648806530047
+    },
+    "147": {
+      "cartmass": 2.0,
+      "polemass": 0.8884237142458566,
+      "polelength": 1.4296463183612589
+    },
+    "146": {
+      "cartmass": 2.0,
+      "polemass": 0.4077944105030492,
+      "polelength": 1.4013678687407765
+    }
+  }
+}
