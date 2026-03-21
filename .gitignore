@@ -1,0 +1,105 @@
+models/test
+models/cartpole
+models/cartpole_cos_sin_theta
+models/cartpole_cos_sin_theta_finetune
+inference_run/
+__pycache__/
+cartpole_optimal_trajectory.py
+cartpole_swingup_lqr.py
+# conf/
+controller_design.ipynb
+# curriculum.py
+dmd_cartpole_data/
+dmdc_acrobot.ipynb
+dmdc_cartpole.ipynb
+dmdc_cartpole_newstate.ipynb
+# environment.yml
+# eval.py
+# eval_linearsys.py
+# evaluate_checkpoints.py
+# evaluate_inference_acrobot.ipynb
+# evaluate_inference_cartpole.ipynb
+evaluate_inference_checkpoint_15bf641c-dbc0-4f2f-b62f-fe04f568aacb_100systems/
+evaluate_inference_checkpoint_15bf641c-dbc0-4f2f-b62f-fe04f568aacb_100systems_modeindistr/
+evaluate_inference_checkpoint_15bf641c-dbc0-4f2f-b62f-fe04f568aacb_100systems_modeindistr_new/
+evaluate_inference_checkpoint_15bf641c-dbc0-4f2f-b62f-fe04f568aacb_100systems_modeood/
+evaluate_inference_checkpoint_15bf641c-dbc0-4f2f-b62f-fe04f568aacb_100systems_modeood_new/
+evaluate_inference_checkpoint_3f8379cf-1cf0-47db-9210-5abb1c43e5fb_100systems/
+evaluate_inference_checkpoint_3f8379cf-1cf0-47db-9210-5abb1c43e5fb_100systems_modeindistr/
+evaluate_inference_checkpoint_3f8379cf-1cf0-47db-9210-5abb1c43e5fb_100systems_modeood/
+finetuneSequential_ebonye_cartpole.py
+# generate_dataset.py
+# generate_dataset_acrobot_ebonye.py
+# generate_dataset_cartpole_ebonye.py
+generate_dataset_ebonye.py
+generate_dataset_ebonye_batch.py
+# generate_dataset_ebonye_batch_linearsys.py
+# gym_acrobot_inference.py
+gym_acrobot_swingup_lqr.py
+# gym_acrobot_test.py
+# gym_cartpole_inference.py
+# gym_cartpole_swingup_lqr.py
+# gym_cartpole_test.py
+# gym_continuous_acrobot.py
+# gym_continuous_cartpole.py
+job.sh
+job2.sh
+job_train.sh
+# models.py
+/models/
+# models_acrobot.py
+# models_acrobot_new.py
+# models_cartpole.py
+models_cartpole_LoRAfinetune_acrobot.py
+models_cartpole_finetune_acrobot.py
+# models_linearsys.py
+# multipendulum_mse_vs_context.png
+# multipendulum_phaseplot.png
+nearest_neighbors.ipynb
+num_context.ipynb
+# pendulum_swingup_lqr.ipynb
+# pickleSpecificTest.py
+# plotting_jupyter_cartpole.ipynb
+# plotting_jupyter_linearsys.ipynb
+# plotting_new.py
+# samplers.py
+# schema.py
+slurm-952.out
+slurm-953.out
+slurm-954.out
+slurm-955.out
+slurm-974.out
+slurm-990.out
+slurm-992.out
+slurm-993.out
+# tasks.py
+# test12_mse_y_axis.py
+test12ebonye.py
+# test12ebonye_acrobot_noscale.py
+# test12ebonye_acrobot_noscale_RoPE.py
+# test12ebonye_cartpole_noscale.py
+# test12ebonye_cartpole_noscale_RoPE.py
+# test12ebonye_cartpole_noscale_RoPE_zerodyn.py
+test12ebonye_linearsystem_noscalefinal.py
+# testing_acrobot_batch.ipynb
+# trainSequential.py
+trainSequential_ebonye.py
+# trainSequential_ebonye_acrobot.py
+trainSequential_ebonye_acrobot_finetune copy.py
+trainSequential_ebonye_acrobot_finetune.py
+# trainSequential_ebonye_cartpole.py
+# trainSequential_ebonye_cartpole_zerodyn.py
+# trainSequential_ebonye_linearsystem.py
+upload_to_hf.py
+videos/
+visualize_training_data.ipynb
+# visualize_training_data_acrobot.ipynb
+# visualize_training_data_cartpole.ipynb
+visualize_training_data_linearsystem.ipynb
+# workCon.py
+# workCon_acrobot_aigym.py
+# workCon_cartpole.py
+# workCon_cartpole_aigym.py
+# workCon_ebonye.py
+# workCon_linearsys.py
+
