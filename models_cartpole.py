@@ -756,3 +756,61 @@ class XGBoostModel:
             preds.append(pred)
 
         return torch.stack(preds, dim=1)
+
+
+class RNNModel(nn.Module):
+    """
+    Standard RNN with prediction heads for state, mode, and control input.
+    """
+    def __init__(self, n_dims : dict, hidden_size : int, n_embd=256):
+        super(RNNModel, self).__init__()
+        self.n_dims = n_dims
+
+        # Gemini Recommendation: embed covariates to avoid type inconsistency
+        self.s_embd = nn.Linear(n_dims['state'], n_embd)
+        self.d_embd = nn.Linear(n_dims['distance'], n_embd)
+        self.m_embd = nn.Embedding(n_dims['mode'], n_embd)
+        self.a_embd = nn.Linear(n_dims['control'], n_embd)
+
+        self.rnn = nn.RNN(input_size=4*n_embd, 
+                          hidden_size=hidden_size,
+                          batch_first=True)
+
+        self.head_s = nn.Linear(hidden_size + n_dims['control'], n_dims['state'])
+        self.head_m = nn.Linear(hidden_size, n_dims['mode'])
+        self.head_a = nn.Linear(hidden_size, n_dims['control'])
+
+    def forward(self, s, m, a, inf=False):
+        """
+        Inputs:
+            - s : sequence of states (batch_size, seq_length, 4)
+            - m : sequence of modes (batch_size, seq_length, 1)
+            - a : sequence of control inputs (batch_size, seq_length, 1)
+            - inf : inference mode (T/F)
+
+        Outputs:
+            - s_pred : predicted sequence of states (batch_size, seq_length, 4)
+            - m_logits : sequence of mode logits (batch_size, seq_length, 1)
+            - a_pred : predicted sequence of control inputs (batch_size, seq_length, 1)
+        """
+        if inf:
+            # todo
+            pass
+
+        goal_state = torch.tensor([0.0, 0.0, 1.0, 0.0, 0.0], device=s.device)
+        d = torch.norm(s - goal_state, dim=-1, device=s.device, keepdim=True)
+
+        e_s = torch.relu(self.s_embd(s))
+        e_d = torch.relu(self.d_embd(d))
+        e_m = self.m_embd(m.long()).squeeze(2)
+        e_a = torch.relu(self.a_embd(a))
+
+        x = torch.cat((e_s, e_d, e_m, e_a), dim=-1)
+
+        out, _ = self.rnn(x)
+
+        m_logits = self.head_m(out)
+        a_pred = self.head_a(out)
+        s_pred = self.head_s(torch.cat((out, a_pred), dim=-1))
+
+        return s_pred, m_logits, a_pred

@@ -173,8 +173,56 @@ def train(model, args):
     torch.save(training_state, checkpoint_path)
     print(f"Final Checkpoint saved at epoch {epoch+1}, step {current_step}: {checkpoint_path}")              
 
-def train_step(model, xs, ys, optimizer, loss, current_step, args, num_training_steps):
-    ...
+def train_step(model, xs, ys, optimizer, state_loss, current_step, args, num_training_steps):
+    optimizer.zero_grad()
+    
+    # Normalizing Data
+    state_max_scale = [7.0, 8.0, 1.0, 1.0, 5.0]
+    control_max_scale = 15.0
+    xs_sc = xs / torch.tensor(states_max_scale, device=xs.device)
+    ys_sc = ys / torch.tensor([control_scale, 1.0], device=ys.device)
+    ys_sc_for_model = ys_scaled.clone()
+    ys_sc_for_model[..., 1] = ys_scaled_for_model[..., 1] + 1 # -1, 0, 1 -> 0, 1, 2
+
+    # Forward Pass
+    s, m, a = xs_sc, ys_sc_for_model[..., 1], ys_sc_for_model[..., 0]
+    s_pred, m_logits, a_pred = model(s, m, a)
+    s_pred, m_logits, a_pred = s_pred.detach(), m_logits.detach(), a_pred.detach()
+
+    # Mask for Zero-Dynamics Indices (assuming label at idx 1 and -1 means zero-dynamics)
+    zero_dyn_mask = ys_scaled[..., 1] == -1  
+    zero_dyn_mask = zero_dyn_mask.unsqueeze(-1)
+
+    # Control Input Regression MSE Loss (mask is used so that predicted actions during zero-dynamics timesteps are not penalized)
+    ys_sc = ys_sc.to(a_pred.device)
+    raw_mse = (a_pred.squeeze(-1)[:,:-1] - ys_sc[:, :-1, 0]).pow(2)
+    active_mask = (~zero_dyn_mask[:, :-1].squeeze(-1)).float().to(raw_mse.device)  
+    loss_controls = (raw_mse * active_mask).sum() / (active_mask.sum()+1e-8)
+
+    # State Regression Loss
+    xs_sc = xs_sc.to(s_pred.device)
+    loss_states = state_loss(s_pred[:,:-1], xs_sc[:,1:])
+
+    # Mode Classification Cross-Entropy Loss
+    target_modes = (ys_sc[:, :-1, 1] + 1).long()
+    mode_logits_flat = m_logits[:, :-1, :].reshape(-1, 3)
+    target_modes_flat = target_modes.reshape(-1)
+    loss_switch = nn.CrossEntropyLoss()(mode_logits_flat, target_modes_flat)
+
+    # Total Loss
+    alpha_controls = 1.0
+    alpha_states = 5.0
+    alpha_switch = 1.0
+    loss = alpha_controls * loss_controls + alpha_states * loss_states + alpha_switch * loss_switch
+
+    # Backward Pass
+    loss.backward()
+    prev_grad_norm = sum(p.grad.detach().data.norm(2).item() ** 2 for p in model.parameters() if p.grad is not None) ** 0.5
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+    grad_norm = sum(p.grad.detach().data.norm(2).item() ** 2 for p in model.parameters() if p.grad is not None) ** 0.5
+    optimizer.step()
+
+    return loss.detach().item(), (s_pred, m_logits, a_pred), grad_norm, prev_grad_norm
 
 def load_chunk(chunk_index : int, 
                num_chunks : int, 
@@ -240,8 +288,8 @@ if __name__ == "__main__":
         model_dest_path = os.path.join(args.out_dir, "models_cartpole.py")
         shutil.copy(model_source_path, model_dest_path)
 
-        train_source_path = "trainSequential_ebonye_cartpole_zerodyn.py"
-        train_dest_path = os.path.join(args.out_dir, "trainSequential_ebonye_cartpole_zerodyn.py")
+        train_source_path = "train_rnn_baseline.py"
+        train_dest_path = os.path.join(args.out_dir, "train_rnn_baseline.py")
         shutil.copy(train_source_path, train_dest_path)
 
     main(args)
