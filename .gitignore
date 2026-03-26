@@ -1,5 +1,6 @@
 models/test
 models/cartpole
+models/cartpole_rnn
 models/cartpole_cos_sin_theta
 models/cartpole_cos_sin_theta_finetune
 inference_run/

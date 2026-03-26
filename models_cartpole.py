@@ -798,7 +798,7 @@ class RNNModel(nn.Module):
             pass
 
         goal_state = torch.tensor([0.0, 0.0, 1.0, 0.0, 0.0], device=s.device)
-        d = torch.norm(s - goal_state, dim=-1, device=s.device, keepdim=True)
+        d = torch.norm(s - goal_state, dim=-1, keepdim=True)
 
         e_s = torch.relu(self.s_embd(s))
         e_d = torch.relu(self.d_embd(d))

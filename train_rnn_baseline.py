@@ -9,7 +9,7 @@ import yaml
 import tasks
 from curriculum import Curriculum
 from schema import schema
-from models_cartpole import build_model
+from models_cartpole import build_model, RNNModel
 import wandb
 import pickle
 import random
@@ -27,7 +27,7 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 # My Imports
-from trainSequential_ebonye_cartpole_zerodyn import count_files_in_folder, load_dataset_full, load_dataset_chunk, SegmentedCartpoleDataset, main
+from trainSequential_ebonye_cartpole_zerodyn import count_files_in_folder, load_dataset_full, load_dataset_chunk, SegmentedCartpoleDataset
 
 random.seed(42)
 np.random.seed(42)
@@ -35,15 +35,16 @@ torch.manual_seed(42)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(42)
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 torch.backends.cudnn.benchmark = True
-
 
 def train(model, args):
     optimizer = torch.optim.AdamW(model.parameters(),
                                   lr=args.training.learning_rate,
                                   weight_decay=1e-4)
     curriculum = Curriculum(args.training.curriculum)
-    loss = getattr(tasks, args.loss, None)
+    loss_func = getattr(tasks, args.loss, None)
+    assert loss_func is not None, f"Loss function {args.loss} not found in tasks module"
 
     # Paths
     state_path = os.path.join(args.out_dir, "state.pt")
@@ -103,7 +104,7 @@ def train(model, args):
                 dataloader = DataLoader(segmented_dataset, batch_size=batch_size, sampler=sampler, num_workers=2)
                 with tqdm(total=len(dataloader), desc=f"Training Chunk {chunk_idx + 1}/{num_chunks}") as pbar:
                     for xs, ys, _, _, _ in dataloader:
-                        loss, _, grad_norm, prev_grad_norm = train_step(model, xs, ys, optimizer, loss, current_step, args, num_training_steps) 
+                        loss, _, grad_norm, prev_grad_norm = train_step(model, xs, ys, optimizer, loss_func, current_step, args, num_training_steps) 
                         
                         lr_scheduler.step()
                         curriculum.update()
@@ -135,7 +136,7 @@ def train(model, args):
                             torch.save(training_state, checkpoint_path)
                             print(f"Checkpoint saved at epoch {epoch+1}, step {current_step}: {checkpoint_path}")
                         
-                        elif current_step % 1000 == 0 and not args.test_run and current_step >= 5000 and local_rank == 0:
+                        elif current_step % 25000 == 0 and not args.test_run and current_step >= 5000 and local_rank == 0:
                             training_state = {
                                 "model_state_dict": model.state_dict(),
                                 "optimizer_state_dict": optimizer.state_dict(),
@@ -179,18 +180,18 @@ def train_step(model, xs, ys, optimizer, state_loss, current_step, args, num_tra
     # Normalizing Data
     state_max_scale = [7.0, 8.0, 1.0, 1.0, 5.0]
     control_max_scale = 15.0
-    xs_sc = xs / torch.tensor(states_max_scale, device=xs.device)
-    ys_sc = ys / torch.tensor([control_scale, 1.0], device=ys.device)
-    ys_sc_for_model = ys_scaled.clone()
-    ys_sc_for_model[..., 1] = ys_scaled_for_model[..., 1] + 1 # -1, 0, 1 -> 0, 1, 2
+    xs_sc = xs / torch.tensor(state_max_scale, device=xs.device)
+    ys_sc = ys / torch.tensor([control_max_scale, 1.0], device=ys.device)
+    ys_sc_for_model = ys_sc.clone()
+    ys_sc_for_model[..., 1] = ys_sc_for_model[..., 1] + 1 # -1, 0, 1 -> 0, 1, 2
 
     # Forward Pass
-    s, m, a = xs_sc, ys_sc_for_model[..., 1], ys_sc_for_model[..., 0]
+    s, m, a = xs_sc, ys_sc_for_model[..., 1].unsqueeze(-1), ys_sc_for_model[..., 0].unsqueeze(-1)
     s_pred, m_logits, a_pred = model(s, m, a)
-    s_pred, m_logits, a_pred = s_pred.detach(), m_logits.detach(), a_pred.detach()
+    # s_pred, m_logits, a_pred = s_pred.detach(), m_logits.detach(), a_pred.detach()
 
     # Mask for Zero-Dynamics Indices (assuming label at idx 1 and -1 means zero-dynamics)
-    zero_dyn_mask = ys_scaled[..., 1] == -1  
+    zero_dyn_mask = ys_sc[..., 1] == -1  
     zero_dyn_mask = zero_dyn_mask.unsqueeze(-1)
 
     # Control Input Regression MSE Loss (mask is used so that predicted actions during zero-dynamics timesteps are not penalized)
@@ -222,7 +223,7 @@ def train_step(model, xs, ys, optimizer, state_loss, current_step, args, num_tra
     grad_norm = sum(p.grad.detach().data.norm(2).item() ** 2 for p in model.parameters() if p.grad is not None) ** 0.5
     optimizer.step()
 
-    return loss.detach().item(), (s_pred, m_logits, a_pred), grad_norm, prev_grad_norm
+    return loss.detach().item(), (s_pred.detach(), m_logits.detach(), a_pred.detach()), grad_norm, prev_grad_norm
 
 def load_chunk(chunk_index : int, 
                num_chunks : int, 
@@ -235,7 +236,7 @@ def load_chunk(chunk_index : int,
     start_index = chunk_index * files_per_chunk
     end_index = (chunk_index + 1) * files_per_chunk - 1
     if chunk_index == num_chunks - 1:
-        end_idx += remainder
+        end_index += remainder
     
     return load_dataset_chunk(pickle_path, start_index, end_index)
 
@@ -265,10 +266,42 @@ def preprocess(xs : torch.tensor,
 
     return xs_tensor_updated[mask], ys[mask], cart_masses[mask], pole_masses[mask], pole_lengths[mask]
 
+def main(args):
+    if args.test_run:
+        curriculum_args = args.training.curriculum
+        curriculum_args.points.start = curriculum_args.points.end
+        curriculum_args.dims.start = curriculum_args.dims.end
+        args.training.train_steps = 10
+    
+    model = RNNModel(args.model.ndims, args.model.hidden_size, args.model.n_embd)
+
+    dist.init_process_group(backend='nccl')
+    local_rank = int(os.getenv('LOCAL_RANK', '0'))
+    torch.cuda.set_device(local_rank)
+    if local_rank == 0 and not args.test_run:
+        wandb.init(
+            dir=args.out_dir,
+            project=args.wandb.project,
+            entity=args.wandb.entity,
+            config=args.__dict__,
+            notes=args.wandb.notes,
+            name=args.wandb.name,
+            resume=True,
+            id=run_id if run_id is not None else None
+        )
+
+    dist.barrier() 
+
+    model.to(local_rank)
+    model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True)
+    
+    model.train()
+    train(model, args)
+
 if __name__ == "__main__":
     parser = QuinineArgumentParser(schema=schema)
     args = parser.parse_quinfig()
-    assert args.model.family in ["gpt2", "lstm"]
+    assert args.model.family in ["gpt2", "lstm", "rnn"]
     print(f"Running with: {args}")
 
     if not args.test_run: 
