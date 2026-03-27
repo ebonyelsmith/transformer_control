@@ -760,7 +760,7 @@ class XGBoostModel:
 
 class RNNModel(nn.Module):
     """
-    Standard RNN with prediction heads for state, mode, and control input.
+    Standard single-layer RNN with prediction heads for state, mode, and control input.
     """
     def __init__(self, n_dims : dict, hidden_size : int, n_embd=256):
         super(RNNModel, self).__init__()
@@ -793,10 +793,6 @@ class RNNModel(nn.Module):
             - m_logits : sequence of mode logits (batch_size, seq_length, 1)
             - a_pred : predicted sequence of control inputs (batch_size, seq_length, 1)
         """
-        if inf:
-            # todo
-            pass
-
         goal_state = torch.tensor([0.0, 0.0, 1.0, 0.0, 0.0], device=s.device)
         d = torch.norm(s - goal_state, dim=-1, keepdim=True)
 
@@ -808,6 +804,9 @@ class RNNModel(nn.Module):
         x = torch.cat((e_s, e_d, e_m, e_a), dim=-1)
 
         out, _ = self.rnn(x)
+
+        if inf:
+            out = out[:, -1:, :] # take the last output in predicted sequence
 
         m_logits = self.head_m(out)
         a_pred = self.head_a(out)

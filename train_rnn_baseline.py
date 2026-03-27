@@ -188,7 +188,6 @@ def train_step(model, xs, ys, optimizer, state_loss, current_step, args, num_tra
     # Forward Pass
     s, m, a = xs_sc, ys_sc_for_model[..., 1].unsqueeze(-1), ys_sc_for_model[..., 0].unsqueeze(-1)
     s_pred, m_logits, a_pred = model(s, m, a)
-    # s_pred, m_logits, a_pred = s_pred.detach(), m_logits.detach(), a_pred.detach()
 
     # Mask for Zero-Dynamics Indices (assuming label at idx 1 and -1 means zero-dynamics)
     zero_dyn_mask = ys_sc[..., 1] == -1  
