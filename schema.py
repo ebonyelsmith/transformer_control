@@ -21,6 +21,8 @@ model_schema = {
     "n_embd": merge(tinteger, required),
     "n_layer": merge(tinteger, nullable, default(None)),
     "n_head": merge(tinteger, nullable, default(None)),
+    "num_layers": merge(tinteger, nullable, default(None)),
+    "cell_type": merge(tstring, allowed(['rnn', 'lstm', 'gru']), default(None)),
     "hidden_size": merge(tinteger, nullable, default(None)),  # for RNN
 }
 

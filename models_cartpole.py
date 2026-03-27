@@ -760,10 +760,11 @@ class XGBoostModel:
 
 class RNNModel(nn.Module):
     """
-    Standard single-layer RNN with prediction heads for state, mode, and control input.
+    RNN with prediction heads for state, mode, and control input.
     """
-    def __init__(self, n_dims : dict, hidden_size : int, n_embd=256):
+    def __init__(self, n_dims : dict, hidden_size : int, num_layers : int, cell_type : str, n_embd=256):
         super(RNNModel, self).__init__()
+        assert cell_type in ['rnn', 'lstm', 'gru']
         self.n_dims = n_dims
 
         # Gemini Recommendation: embed covariates to avoid type inconsistency
@@ -772,9 +773,21 @@ class RNNModel(nn.Module):
         self.m_embd = nn.Embedding(n_dims['mode'], n_embd)
         self.a_embd = nn.Linear(n_dims['control'], n_embd)
 
-        self.rnn = nn.RNN(input_size=4*n_embd, 
-                          hidden_size=hidden_size,
-                          batch_first=True)
+        if cell_type == 'rnn':
+            self.rnn = nn.RNN(input_size=4*n_embd, 
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            batch_first=True)
+        elif cell_type == 'gru':
+            self.rnn = nn.GRU(input_size=4*n_embd, 
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            batch_first=True)
+        elif cell_type == 'lstm':
+            self.rnn = nn.LSTM(input_size=4*n_embd, 
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            batch_first=True)
 
         self.head_s = nn.Linear(hidden_size + n_dims['control'], n_dims['state'])
         self.head_m = nn.Linear(hidden_size, n_dims['mode'])

@@ -272,7 +272,11 @@ def main(args):
         curriculum_args.dims.start = curriculum_args.dims.end
         args.training.train_steps = 10
     
-    model = RNNModel(args.model.ndims, args.model.hidden_size, args.model.n_embd)
+    model = RNNModel(args.model.ndims, 
+                     args.model.hidden_size, 
+                     args.model.num_layers, 
+                     args.model.cell_type,
+                     args.model.n_embd)
 
     dist.init_process_group(backend='nccl')
     local_rank = int(os.getenv('LOCAL_RANK', '0'))
