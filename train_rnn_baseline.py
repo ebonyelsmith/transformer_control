@@ -50,6 +50,7 @@ def train(model, args):
     state_path = os.path.join(args.out_dir, "state.pt")
     dataset_folder = args.dataset_filesfolder
     picklefolder = args.pickle_folder
+    testpicklefolder = args.pickle_folder_test
     fullpicklepath = os.path.join(dataset_folder, picklefolder)
 
     # Hyperparameters
@@ -86,7 +87,7 @@ def train(model, args):
                 # dataset_full {(states, (control input, mode), cart_mass, pole_masses, pole_length)}
                 dataset, dataset_full, cart_masses, pole_masses, pole_lengths = load_chunk(chunk_idx, num_chunks, files_per_chunk, remainder, fullpicklepath)
 
-                # I don't really understand why this grabs a batch in the chunk.
+                # Batch from chunk
                 xs_tensor, ys_tensor, cartmasses, polemasses, polelengths = dataset_full[0]
                 xs_tensor = xs_tensor.to("cpu")
                 ys_tensor = ys_tensor.to("cpu")
@@ -104,7 +105,9 @@ def train(model, args):
                 dataloader = DataLoader(segmented_dataset, batch_size=batch_size, sampler=sampler, num_workers=2)
                 with tqdm(total=len(dataloader), desc=f"Training Chunk {chunk_idx + 1}/{num_chunks}") as pbar:
                     for xs, ys, _, _, _ in dataloader:
+                        # xs [b, 120, 5], ys [b, 120, 2]
                         loss, loss_a, loss_s, loss_m, _, grad_norm, prev_grad_norm = train_step(model, xs, ys, optimizer, loss_func, current_step, args, num_training_steps) 
+
                         
                         lr_scheduler.step()
                         curriculum.update()
@@ -117,10 +120,27 @@ def train(model, args):
                             wandb.log(
                                 {
                                     "step": current_step,
-                                    "loss": loss,
-                                    "control input mse": loss_a,
-                                    "state mse": loss_s,
-                                    "mode ce": loss_m,
+                                    "train_loss": loss,
+                                    "train_control_mse": loss_a,
+                                    "train_state_mse": loss_s,
+                                    "train_mode_ce": loss_m,
+                                    "grad_norm": grad_norm,
+                                }
+                            )
+                        
+                        if current_step % args.wandb.log_val_every_steps == 0 and not args.test_run and local_rank == 0:
+                            val_loss, val_loss_s, val_loss_a, val_loss_m = validate(model, args)
+                            wandb.log(
+                                {
+                                    "step": current_step,
+                                    "train_loss": loss,
+                                    "train_control_mse": loss_a,
+                                    "train_state_mse": loss_s,
+                                    "train_mode_ce": loss_m,
+                                    "val_loss": val_loss,
+                                    "val_loss_s": val_loss_s,
+                                    "val_loss_a": val_loss_a,
+                                    "val_loss_m": val_loss_m,
                                     "grad_norm": grad_norm,
                                 }
                             )
@@ -204,7 +224,7 @@ def train_step(model, xs, ys, optimizer, state_loss, current_step, args, num_tra
 
     # State Regression Loss
     xs_sc = xs_sc.to(s_pred.device)
-    loss_states = state_loss(s_pred[:,:-1], xs_sc[:,1:])
+    loss_states = state_loss(s_pred[:,:-1], xs_sc[:,1:]) # s_pred[:, t, :] ~ xs_sc[:, t+1, :]
 
     # Mode Classification Cross-Entropy Loss
     target_modes = (ys_sc[:, :-1, 1] + 1).long()
@@ -267,6 +287,77 @@ def preprocess(xs : torch.tensor,
     mask = is_upright.all(dim=1) 
 
     return xs_tensor_updated[mask], ys[mask], cart_masses[mask], pole_masses[mask], pole_lengths[mask]
+
+
+def validate(model, args):
+    model.eval()
+
+    id_loss = 0.0
+    id_state_loss = 0.0
+    id_control_loss = 0.0
+    id_mode_loss = 0.0
+    total_samples_id = 0
+
+    state_loss = getattr(tasks, args.loss, None)
+    id_data_dir = os.path.join(args.dataset_filesfolder, args.pickle_folder_test)
+    pickle_file = os.path.join(id_data_dir, 'batch_test_0_1.pkl')
+    with open(pickle_file, 'rb') as file:
+        id_data = pickle.load(file)
+
+    id_data = TensorDataset(id_data[0], id_data[1], torch.tensor(id_data[2]), torch.tensor(id_data[3]), torch.tensor(id_data[4]))
+    id_loader = DataLoader(id_data, batch_size=64, shuffle=False)
+    for xs, ys, cartmass, polemass, polelength in id_loader:
+        with torch.no_grad():
+            xs, ys = xs[:, :120, :], ys[:, :120, :]
+            xs_cos_tensor = torch.cos(xs[:, :, 2])
+            xs_sin_tensor = torch.sin(xs[:, :, 2])
+            xs = torch.cat((xs[:, :, :2], xs_cos_tensor.unsqueeze(-1), xs_sin_tensor.unsqueeze(-1), xs[:, :, 3:]), dim=-1)
+
+            state_max_scale = [7.0, 8.0, 1.0, 1.0, 5.0]
+            control_max_scale = 15.0
+            xs_sc = xs / torch.tensor(state_max_scale, device=xs.device)
+            ys_sc = ys / torch.tensor([control_max_scale, 1.0], device=ys.device)
+            ys_sc_for_model = ys_sc.clone()
+            ys_sc_for_model[..., 1] = ys_sc_for_model[..., 1] + 1 # -1, 0, 1 -> 0, 1, 2
+
+            s, m, a = xs_sc, ys_sc_for_model[..., 1].unsqueeze(-1), ys_sc_for_model[..., 0].unsqueeze(-1)
+            s_pred, m_logits, a_pred = model(s, m, a)
+
+            # Control Input Regression Loss
+            ys_sc = ys_sc.to(a_pred.device)
+            loss_controls = (a_pred.squeeze(-1)[:,:-1] - ys_sc[:, :-1, 0]).pow(2).mean()
+
+            # State Regression Loss
+            xs_sc = xs_sc.to(s_pred.device)
+            loss_states = state_loss(s_pred[:,:-1], xs_sc[:,1:]) # s_pred[:, t, :] ~ xs_sc[:, t+1, :]
+
+            # Mode Classification Cross-Entropy Loss
+            target_modes = (ys_sc[:, :-1, 1] + 1).long()
+            mode_logits_flat = m_logits[:, :-1, :].reshape(-1, 3)
+            target_modes_flat = target_modes.reshape(-1)
+            loss_switch = nn.CrossEntropyLoss()(mode_logits_flat, target_modes_flat)
+
+            # Total Loss
+            alpha_controls = 1.0
+            alpha_states = 5.0
+            alpha_switch = 1.0
+            loss = alpha_controls * loss_controls + alpha_states * loss_states + alpha_switch * loss_switch
+
+            batch_size = xs.size(0)           
+            id_loss += (loss.item() * batch_size)
+            id_state_loss += (loss_states.item() * batch_size)
+            id_control_loss += (loss_controls.item() * batch_size)
+            id_mode_loss += (loss_switch.item() * batch_size)
+            total_samples_id += batch_size
+    
+    id_loss /= total_samples_id
+    id_state_loss /= total_samples_id
+    id_control_loss /= total_samples_id
+    id_mode_loss /= total_samples_id
+
+    model.train()
+    return id_loss, id_state_loss, id_control_loss, id_mode_loss
+
 
 def main(args):
     if args.test_run:

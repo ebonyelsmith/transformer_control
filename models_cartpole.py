@@ -795,10 +795,16 @@ class RNNModel(nn.Module):
         self.head_m = nn.Linear(hidden_size, n_dims['mode'])
         self.head_a = nn.Linear(hidden_size, n_dims['control'])
 
+        self.input_ln = nn.LayerNorm(1024)
+
+        for name, param in self.rnn.named_parameters():
+            if 'weight' in name:
+                nn.init.orthogonal_(param)
+
     def forward(self, s, m, a, inf=False):
         """
         Inputs:
-            - s : sequence of states (batch_size, seq_length + 1, 4)
+            - s : sequence of states (batch_size, seq_length, 4)
             - m : sequence of modes (batch_size, seq_length, 1)
             - a : sequence of control inputs (batch_size, seq_length, 1)
             - inf : inference mode (T/F)
@@ -818,10 +824,11 @@ class RNNModel(nn.Module):
         # --- 3/27/26 12pm : NO RELU! Data normalized around origin, crushing half 
         e_s = self.s_embd(s)
         e_d = self.d_embd(d)
-        e_m = self.m_embd(m.long()).squeeze(2)
+        e_m = self.m_embd(m.long().squeeze(-1))
         e_a = self.a_embd(a)
 
         x = torch.cat((e_s, e_d, e_m, e_a), dim=-1)
+        x = self.input_ln(x)
 
         out, _ = self.rnn(x)
 
