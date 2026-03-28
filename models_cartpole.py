@@ -789,14 +789,16 @@ class RNNModel(nn.Module):
                             num_layers=num_layers,
                             batch_first=True)
 
-        self.head_s = nn.Linear(hidden_size + n_dims['control'], n_dims['state'])
+        # self.head_s = nn.Linear(hidden_size + n_dims['control'], n_dims['state'])
+        # --- 3/27/26 12pm: See changes below to state prediction
+        self.head_s = nn.Linear(hidden_size, n_dims['state'])
         self.head_m = nn.Linear(hidden_size, n_dims['mode'])
         self.head_a = nn.Linear(hidden_size, n_dims['control'])
 
     def forward(self, s, m, a, inf=False):
         """
         Inputs:
-            - s : sequence of states (batch_size, seq_length, 4)
+            - s : sequence of states (batch_size, seq_length + 1, 4)
             - m : sequence of modes (batch_size, seq_length, 1)
             - a : sequence of control inputs (batch_size, seq_length, 1)
             - inf : inference mode (T/F)
@@ -809,10 +811,15 @@ class RNNModel(nn.Module):
         goal_state = torch.tensor([0.0, 0.0, 1.0, 0.0, 0.0], device=s.device)
         d = torch.norm(s - goal_state, dim=-1, keepdim=True)
 
-        e_s = torch.relu(self.s_embd(s))
-        e_d = torch.relu(self.d_embd(d))
+        # e_s = torch.relu(self.s_embd(s))
+        # e_d = torch.relu(self.d_embd(d))
+        # e_m = self.m_embd(m.long()).squeeze(2)
+        # e_a = torch.relu(self.a_embd(a))
+        # --- 3/27/26 12pm : NO RELU! Data normalized around origin, crushing half 
+        e_s = self.s_embd(s)
+        e_d = self.d_embd(d)
         e_m = self.m_embd(m.long()).squeeze(2)
-        e_a = torch.relu(self.a_embd(a))
+        e_a = self.a_embd(a)
 
         x = torch.cat((e_s, e_d, e_m, e_a), dim=-1)
 
@@ -823,6 +830,8 @@ class RNNModel(nn.Module):
 
         m_logits = self.head_m(out)
         a_pred = self.head_a(out)
-        s_pred = self.head_s(torch.cat((out, a_pred), dim=-1))
+        # s_pred = self.head_s(torch.cat((out, a_pred), dim=-1))
+        # --- 3/27/26 12pm : This predicted s_t with a_t (nonsense).
+        s_pred = self.head_s(out)
 
         return s_pred, m_logits, a_pred

@@ -104,7 +104,7 @@ def train(model, args):
                 dataloader = DataLoader(segmented_dataset, batch_size=batch_size, sampler=sampler, num_workers=2)
                 with tqdm(total=len(dataloader), desc=f"Training Chunk {chunk_idx + 1}/{num_chunks}") as pbar:
                     for xs, ys, _, _, _ in dataloader:
-                        loss, _, grad_norm, prev_grad_norm = train_step(model, xs, ys, optimizer, loss_func, current_step, args, num_training_steps) 
+                        loss, loss_a, loss_s, loss_m, _, grad_norm, prev_grad_norm = train_step(model, xs, ys, optimizer, loss_func, current_step, args, num_training_steps) 
                         
                         lr_scheduler.step()
                         curriculum.update()
@@ -118,6 +118,9 @@ def train(model, args):
                                 {
                                     "step": current_step,
                                     "loss": loss,
+                                    "control input mse": loss_a,
+                                    "state mse": loss_s,
+                                    "mode ce": loss_m,
                                     "grad_norm": grad_norm,
                                 }
                             )
@@ -222,7 +225,7 @@ def train_step(model, xs, ys, optimizer, state_loss, current_step, args, num_tra
     grad_norm = sum(p.grad.detach().data.norm(2).item() ** 2 for p in model.parameters() if p.grad is not None) ** 0.5
     optimizer.step()
 
-    return loss.detach().item(), (s_pred.detach(), m_logits.detach(), a_pred.detach()), grad_norm, prev_grad_norm
+    return loss.detach().item(), loss_controls.detach(), loss_states.detach().item(), loss_switch.detach().item(), (s_pred.detach(), m_logits.detach(), a_pred.detach()), grad_norm, prev_grad_norm
 
 def load_chunk(chunk_index : int, 
                num_chunks : int, 
