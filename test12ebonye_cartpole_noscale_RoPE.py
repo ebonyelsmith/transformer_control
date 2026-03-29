@@ -31,7 +31,7 @@ model_run_id= "5a28bfa8-c81f-473b-996f-879dfadc62df" #"3f8379cf-1cf0-47db-9210-5
 # model_checkpoint_step= 40000 #30000 #55000 #274941 #195000 #5000 #15000 #274941 #115000 #300800 #204800 #102400
 model_checkpoint_epoch = 1 #25 #59 #125 #14 #38 #60 #125
 # folder_name = f"inference_run/{plot_label}_{model_checkpoint_step}_{model_run_id}"
-mode = 'ood' # 'train', 'ood', 'indistr'
+mode = 'indistr' # 'train', 'ood', 'indistr'
 
     
 

@@ -104,7 +104,7 @@ class TransformerModel(nn.Module):
         self.time_embedding = nn.Embedding(600, n_embd) #cartpole #800
         self.state_embedding = nn.Linear(n_dims, n_embd)
         self.control_embedding = nn.Linear(1, n_embd)
-        self.switch_embedding = nn.Embedding(2, n_embd)  # add embedding for switching controller for cartpole
+        self.switch_embedding = nn.Embedding(3, n_embd)  # add embedding for switching controller for cartpole
         # self.control_embedding = nn.Linear(2, n_embd)  # add label for switching controller for cartpole
         self.distance_embedding = nn.Linear(1, n_embd)  # add distance embedding for cartpole
 
@@ -113,7 +113,7 @@ class TransformerModel(nn.Module):
         self._backbone = GPT2Model(configuration)
         
         self._state_head = nn.Linear(n_embd, n_dims) #4/18/2025 cartpole
-        self.switch_head = nn.Linear(n_embd, 1)  # add label for switching controller for cartpole
+        self.switch_head = nn.Linear(n_embd, 3)  # add label for switching controller for cartpole
         # self._state_head = nn.Linear(n_embd, 2) #4/18/2025 pendulum and linear system
         self._control_head = nn.Linear(n_embd, 1) # no label for switching controller
         # self._control_head = nn.Linear(n_embd, 2)  # add label for switching controller for cartpole

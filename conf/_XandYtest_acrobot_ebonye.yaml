@@ -13,13 +13,13 @@ training:
     data: gaussian # Dont need this, change schema later
     task_kwargs: {} # Dont need this, change schema later
     epochs: 1 
-    batch_size: 6000 
+    batch_size: 4000 
     learning_rate: 0.0003 #0.0001 #train
     save_every_steps: 5000 #1000
     keep_every_steps: 5000 #1000
     train_steps: 6000 #3800
-    test_pendulums: 2 #batches of 5000
-    test_pendulums_outofdistr: 2 #batches of 5000
+    test_pendulums: 1 #batches of 5000
+    test_pendulums_outofdistr: 1 #batches of 5000
     # resume_id: "056764e2-f56a-4e25-8019-3ce5098c388c"
     curriculum:
         dims:

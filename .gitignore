@@ -44,7 +44,7 @@ gym_acrobot_swingup_lqr.py
 # gym_continuous_cartpole.py
 job.sh
 job2.sh
-job_train.sh
+# job_train.sh
 # models.py
 /models/
 # models_acrobot.py
@@ -64,14 +64,10 @@ num_context.ipynb
 # plotting_new.py
 # samplers.py
 # schema.py
-slurm-952.out
-slurm-953.out
-slurm-954.out
-slurm-955.out
-slurm-974.out
-slurm-990.out
-slurm-992.out
-slurm-993.out
+
+# any file beginning with "slurm"
+slurm* 
+
 # tasks.py
 # test12_mse_y_axis.py
 test12ebonye.py

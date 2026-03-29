@@ -800,7 +800,7 @@ class AcrobotSampler(DataSampler):
         return Y0
     
     # def generate_xs_dataset(self, n_points, b_size, mass=1, length=1):
-    def generate_xs_dataset(self, n_points, b_size, LINK_LENGTH_1=[1.0], LINK_LENGTH_2=[1.0], LINK_MASS_1=[1.0], LINK_MASS_2=[1.0], dt=0.02, test_mode=False):
+    def generate_xs_dataset(self, n_points, b_size, LINK_LENGTH_1=[1.0], LINK_LENGTH_2=[1.0], LINK_MASS_1=[1.0], LINK_MASS_2=[1.0], dt=0.02, test_mode={'on': False, 'context': 100}):
         """
         Generates datasets for training or evaluation by simulating the states and control values of acrobot system.
 

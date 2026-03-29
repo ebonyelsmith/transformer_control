@@ -270,8 +270,8 @@ def make_train_data(args):
 
     """
     curriculum = Curriculum(args.training.curriculum)
-    starting_step = 6400
-    # starting_step = 1002
+    # starting_step = 0
+    starting_step = 5650
     bsize = args.training.batch_size
     pbar = tqdm(range(starting_step, args.training.train_steps + args.training.test_pendulums + args.training.test_pendulums_outofdistr)) 
     # pbar_test = tqdm(range(args.training.test_pendulums))

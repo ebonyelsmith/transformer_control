@@ -38,7 +38,7 @@ mode = 'ood' # 'train', 'ood', 'indistr'
 total_time = 14 #4 #5 #1.5
 dt = 0.025
 # Num_of_context = 30 #50 #150
-Num_of_pendulums = 5 #100 #200 #1 #10 #20 #40 #10
+Num_of_pendulums = 100 #5 #100 #200 #1 #10 #20 #40 #10
 # start_index_num = [Num_of_context]
 
 
@@ -345,7 +345,17 @@ def run_inference_on_model(model, XData, YS, total_time, device, dt=0.01, contex
             # u = u_pred[0][-1][0]
             # u_with_label = u_pred[0][-1]
             flag_pred = flag_pred[0][-1] # 7/18/2025
-            flag_pred = torch.argmax(flag_pred)-1 #.float() # 7/18/2025
+            flag_pred = torch.argmax(flag_pred)-1 #.float()
+            if i >= context:
+                # If the model is stuck in 'identification' mode (-1) 
+                # but we are past the context window, force it to 'swing-up' (0)
+                if flag_pred == -1:
+                    actual_mode_to_use = torch.tensor(0, device=device)
+                else:
+                    actual_mode_to_use = flag_pred
+            else:
+                actual_mode_to_use = torch.tensor(-1, device=device)
+             # 7/18/2025
             # flag_prob = torch.sigmoid(flag_pred) # 7/24/2025
             # flag_pred = 1 if flag_pred > 0.5 else 0
             # flag_pred = (flag_prob > 0.5).int() #.float() # 7/24/2025
@@ -363,7 +373,8 @@ def run_inference_on_model(model, XData, YS, total_time, device, dt=0.01, contex
             # print(f"u: {u}, flag_pred: {flag_pred}") #7/18/2025
             # u_with_label = torch.cat((u.unsqueeze(0), flag_pred.unsqueeze(0)), dim=0) # 7/18/2025
             # u_with_label = u_with_label.squeeze(-1)
-            u_with_label = torch.cat((u * control_scale, flag_pred.unsqueeze(0)), dim=0) # 7/18/2025
+            # u_with_label = torch.cat((u * control_scale, flag_pred.unsqueeze(0)), dim=0) # 7/18/2025
+            u_with_label = torch.cat((u * control_scale, actual_mode_to_use.unsqueeze(0)), dim=0) 
             u_with_label = u_with_label.squeeze(-1) #6/25/2025
             
         # import pdb; pdb.set_trace()
@@ -853,7 +864,9 @@ try:
     # model_checkpoint_step_list = [8000, 9000, 10000, 
     #                               12000, 14000, 16000, 18000, 20000, 25000, 30000, 35000, 40000, 43734]
     # model_checkpoint_step_list = [16000, 20000, 30000, 40000, 43734]
-    model_checkpoint_step_list =[17000]
+    # model_checkpoint_step_list = [10000, 50000] #[17000]
+    # model_checkpoint_step_list = [200, 400, 2000, 5000, 10000, 17000, 30000, 60000, 100000, 200000]
+    model_checkpoint_step_list = [5000, 10000, 17000, 30000, 60000, 100000, 200000]
     Num_of_contexts = [1, 5, 10, 25, 50]
     # Num_of_contexts = [5]
 

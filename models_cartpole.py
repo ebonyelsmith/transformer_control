@@ -206,13 +206,13 @@ class TransformerModel(nn.Module):
             xs_b = xs.unsqueeze(0)  
             ys_b = ys.unsqueeze(0)
 
-            print(f"I'M HERE##########################################################")
-            print(f"ys_b before: {ys_b}")
+            # print(f"I'M HERE##########################################################")
+            # print(f"ys_b before: {ys_b}")
             if xs_b.shape[1] == ys_b.shape[1] + 1:
                 # padding = torch.zeros((ys_b.shape[0], 1), device=ys_b.device) # 5/25/2025 padding for ys no label
                 padding = torch.zeros((ys_b.shape[0], 1, 2), device=xs.device)  # 5/25/2025 padding for ys with label
                 ys_b = torch.cat((ys_b, padding), dim=1)
-            print(f"ys_b after: {ys_b}")
+            # print(f"ys_b after: {ys_b}")
             # import pdb; pdb.set_trace()
             # zs = self._combine(xs_b, ys_b)
             # zs = self._combine_ebonye(xs_b, ys_b)  
@@ -304,7 +304,7 @@ class TransformerModel(nn.Module):
         # print(f"ys shape: {ys.shape}")
 
         
-        print(f"I'M HERE##########################################################")
+        # print(f"I'M HERE##########################################################")
             
         if xs.shape[1] == ys.shape[1] + 1:
             # padding = torch.zeros((ys.shape[0], 1), device=ys.device)

@@ -636,7 +636,8 @@ def simulate_acrobot_batch(
     dt=0.05,
     device='cuda:0',
     torque_noise_max=0.0,
-    test_mode = False
+    # test_mode = False
+    test_mode = {'on': False, 'context': 100}
 ):
     """
     Batched Acrobot simulation using RK4 and vectorized PyTorch.
@@ -688,10 +689,15 @@ def simulate_acrobot_batch(
         obs = observations[i]
 
         # Compute batched torque using your swingup + LQR logic
-        # torque, mode, q2d_prev = swingup_lqr_controller2(
-        torque, mode, q2d_prev, K_lqr = swingup_lqr_controller2(
-            obs, model_params, mode, K_lqr=K_lqr, q2d_prev=q2d_prev
-        )
+        if i < test_mode['context'] and not test_mode['on']:
+            torque = torch.zeros(batch_size, device=device)
+        elif i < test_mode['context'] and test_mode['on']:
+            torque = torch.zeros(batch_size, device=device)
+        else:
+            # torque, mode, q2d_prev = swingup_lqr_controller2(
+            torque, mode, q2d_prev, K_lqr = swingup_lqr_controller2(
+                obs, model_params, mode, K_lqr=K_lqr, q2d_prev=q2d_prev
+            )
 
         # print(f"step {i}, q2d_prev: {q2d_prev}")
 
@@ -721,7 +727,7 @@ def simulate_acrobot_batch(
 
 
         # Inject noise in observations when mode == 1 (LQR) when not in test mode
-        if lqr_mask.any() and not test_mode:
+        if lqr_mask.any() and not test_mode['on']:
             noise = torch.randn_like(nobservation)*0.01
             nobservation[lqr_mask] += noise[lqr_mask]
             nobservation[:,0] = wrap(nobservation[:,0], -torch.pi, torch.pi)
@@ -738,7 +744,10 @@ def simulate_acrobot_batch(
         control_modes[i] = mode
 
         # if i == 1000:
-        #     import pdb; pdb.set_trace()
+        #     import pdb; pdb.set_trace
+    
+    # fix control modes to be -1 for the first steps where we don't apply control
+    control_modes[:test_mode['context']] = -1
 
     
     # import pdb; pdb.set_trace()
@@ -761,7 +770,8 @@ def checking_acrobot(
     dt=0.05,
     device='cuda:0',
     torque_noise_max=0.0,
-    test_mode=False
+    # test_mode=False
+    test_mode= {'on': False, 'context': 100}
 ):
     """
     Check the batched Acrobot system simulation with given parameters.
