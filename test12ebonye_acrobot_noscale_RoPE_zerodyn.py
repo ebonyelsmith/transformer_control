@@ -33,7 +33,7 @@ model_run_id= "efc700a2-0b51-4853-885d-557ba3c9d942" #"aa880853-841e-4b61-a7a7-9
 # model_checkpoint_step= 90000 #30000 #260000 #284408 #195000 #237346 #207672 #185000 #80000 #105000 #50000 #55000 #274941 #195000 #5000 #15000 #274941 #115000 #300800 #204800 #102400
 model_checkpoint_epoch = 1 #25 #59 #125 #14 #38 #60 #125
 # folder_name = f"inference_run/{plot_label}_{model_checkpoint_step}_{model_run_id}"
-mode = 'ood' # 'train', 'ood', 'indistr'
+mode = 'indistr' # 'train', 'ood', 'indistr'
 
     
 
@@ -929,7 +929,7 @@ try:
     # model_checkpoint_step_list = [395000]
     # model_checkpoint_step_list = [50000, 135000, 300000]
     # model_checkpoint_step_list = [10000, 20000, 30000, 60000, 100000]
-    model_checkpoint_step_list = [50000] #, 60000, 10000, 20000, 30000, 100000, 135000, 200000, 300000]
+    model_checkpoint_step_list = [300000] #[50000] #, 60000, 10000, 20000, 30000, 100000, 135000, 200000, 300000]
     Num_of_contexts = [1, 5, 10, 25, 50, 75, 100]
 
     for step in tqdm(model_checkpoint_step_list, desc="Model Checkpoint Steps"):
