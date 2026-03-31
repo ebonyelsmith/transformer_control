@@ -138,12 +138,25 @@ def run_single_system(masscart, masspole, length, state_data, ctrl_data, run_idx
     plt.close()
 
     # Save States and controls on one plot
-    plt.figure(figsize=(15, 10))
+    # font parameters for plots
+    parameters = {
+        'font.size': 22,
+        'axes.labelsize': 24,
+        'axes.titlesize': 24,
+        'xtick.labelsize': 22,
+        'ytick.labelsize': 22,
+        'legend.fontsize': 16,
+        'font.family': 'serif'
+    }
+    plt.rcParams.update(parameters)
+
+    plt.figure(figsize=(10, 10))
     for i in range(4):
         plt.subplot(3, 2, i+1)
-        plt.scatter(range(len(states)), states[:, i], label='Transformer ' + labels[i], color=colors[i], s=10)
+        # plt.subplot(2, 3, i+1)
+        plt.scatter(range(len(states)), states[:, i], label='Transformer', color=colors[i], s=10)
         if true_state_data is not None and true_ctrl_data is not None:
-            plt.scatter(range(len(true_states)), true_states[:, i], label='Reference ' + labels[i], color='cyan', s=10, alpha=0.5)
+            plt.scatter(range(len(true_states)), true_states[:, i], label='Reference', color='cyan', s=10, alpha=0.5)
         # plt.title(labels[i] + ' Over Time') if true_state_data is None else plt.title(f'Transformer vs Reference {labels[i]} Over Time (Context: {context})')
         # plt.xlabel('Time Step', fontsize)
         plt.xlabel('Time Step', fontsize=24)
@@ -153,12 +166,13 @@ def run_single_system(masscart, masspole, length, state_data, ctrl_data, run_idx
         plt.yticks(fontsize=22)
         plt.grid()
         # plt.legend()
-        plt.legend(fontsize=16)
+        # plt.legend(fontsize=16)
 
     plt.subplot(3, 2, 5)
-    plt.scatter(range(len(actions)), actions[:,0], label='Transformer Control Actions', color='red', s=10)
+    # plt.subplot(2, 3, 5)
+    plt.scatter(range(len(actions)), actions[:,0], label='Transformer', color='red', s=10)
     if true_state_data is not None and true_ctrl_data is not None:
-        plt.scatter(range(len(true_actions)), true_actions[:,0], label='Reference Control Actions', color='cyan', s=10)
+        plt.scatter(range(len(true_actions)), true_actions[:,0], label='Reference', color='cyan', s=10)
     # plt.title('Control Actions Over Time') if true_ctrl_data is None else plt.title(f'Predicted vs Reference Control Actions Over Time (Context: {context})')
     # plt.xlabel('Time Step')
     plt.xlabel('Time Step', fontsize=24)
@@ -168,12 +182,13 @@ def run_single_system(masscart, masspole, length, state_data, ctrl_data, run_idx
     plt.yticks(fontsize=22)
     plt.grid()
     # plt.legend()
-    plt.legend(fontsize=16)
+    # plt.legend(fontsize=16)
     plt.subplot(3, 2, 6)
-    plt.scatter(range(len(actions)), actions[:,1] + 1.0, label='Transformer Control Labels', color='red', s=10)
+    # plt.subplot(2, 3, 6)
+    plt.scatter(range(len(actions)), actions[:,1] + 1.0, label='Transformer', color='red', s=10)
     if true_state_data is not None and true_ctrl_data is not None:
         updated_true_actions = true_actions[:,1] + 1.0  # Shift true control labels up by 1.0 for better visualization
-        plt.scatter(range(len(true_actions)), updated_true_actions, label='Reference Control Labels', color='cyan', s=10, alpha=0.5)
+        plt.scatter(range(len(true_actions)), updated_true_actions, label='Reference', color='cyan', s=10, alpha=0.5)
     # plt.title('Control Labels Over Time') if true_ctrl_data is None else plt.title(f'Predicted vs Reference Control Labels Over Time (Context: {context})')
     # plt.xlabel('Time Step')
     plt.xlabel('Time Step', fontsize=24)
@@ -183,8 +198,43 @@ def run_single_system(masscart, masspole, length, state_data, ctrl_data, run_idx
     plt.yticks(fontsize=22)
     plt.grid()
     # plt.legend()
-    plt.legend(fontsize=16)
-    plt.tight_layout()
+    # plt.legend(fontsize=16)
+    # one big legend for the whole figure
+
+    # 1. Get handles and labels from the FIRST subplot (since they are all the same)
+    # This is much cleaner than looping through all axes
+    handles, labels = plt.gcf().axes[0].get_legend_handles_labels()
+
+    # 2. Use fig.legend to attach it to the whole 20x10 canvas
+    # We place it at the very top or very bottom of the FIGURE
+    fig = plt.gcf()
+    fig.legend(
+        handles, 
+        labels, 
+        loc='lower center', 
+        bbox_to_anchor=(0.5, 0.02),
+        ncol=2, 
+        fontsize=24,
+        markerscale=4.0,     # This multiplies the legend marker size by 4
+        frameon=True, 
+        edgecolor='black'
+    )
+
+    # 3. Adjust layout to leave room for the legend at the bottom
+    # rect=[left, bottom, right, top]
+    plt.tight_layout(rect=[0, 0.08, 1, 1])
+
+    # handles, labels = [], []
+    # for ax in plt.gcf().axes:
+    #     h, l = ax.get_legend_handles_labels()
+    #     # print(f"h: {h}, l: {l}")
+    #     # if l not in labels:  # Avoid duplicate labels in the legend
+    #     handles.extend(h)
+    #     labels.extend(l)
+    #     if labels == l:
+    #         break
+    # plt.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=2, frameon=True, shadow=False, framealpha=0.6, fontsize=16)
+    # plt.tight_layout()
     # plt.savefig(os.path.join(path, 'states_and_controls.png'))
     plt.savefig(os.path.join(path, 'states_and_controls.pdf'), format='pdf', bbox_inches='tight')
     plt.close()
@@ -202,8 +252,21 @@ def run_single_system(masscart, masspole, length, state_data, ctrl_data, run_idx
 
 def load_data(data_path):
     with open(data_path, 'rb') as f:
-        data = pickle.load(f)
+        # data = pickle.load(f)
+        data = CPU_Unpickler(f).load()
     return data
+
+import os
+import pickle
+import io
+import os
+
+# 1. Define a helper class to force CPU loading
+class CPU_Unpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
+        return super().find_class(module, name)
 
 
 if __name__ == "__main__":
@@ -219,7 +282,7 @@ if __name__ == "__main__":
     os.makedirs(save_dir, exist_ok=True)
     numberpend = 5 #3 #11 #10 #200 #5
     context = 50
-    mode = 'ood' # 'train', 'ood', 'indistr'
+    mode = 'indistr' # 'train', 'ood', 'indistr'
     case_type = 'passing_cases' # 'passing_cases', 'failure_cases'
     data_path = f'inference_run/mse_control_{step}_{model_run_id}/results_maxcontext{context}_numpends{numberpend}_{mode}_alexcode.pkl'
     cartmasses, polemasses, polelengths, phase_data, controls_data, data_and_controls, pends = load_data(data_path)

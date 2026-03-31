@@ -12,6 +12,36 @@ import matplotlib.pyplot as plt
 # from gym_cartpole_swingup_lqr import swingup_lqr_controller
 from gym_continuous_acrobot import AcrobotEnv
 
+def wrap(x, m=-np.pi-0.002, M=np.pi-0.002):
+    """Wraps ``x`` so m <= x <= M; but unlike ``bound()`` which
+    truncates, ``wrap()`` wraps x around the coordinate system defined by m,M.\n
+    For example, m = -180, M = 180 (degrees), x = 360 --> returns 0.
+
+    Args:
+        x: a scalar
+        m: minimum possible value in range
+        M: maximum possible value in range
+
+    Returns:
+        x: a scalar, wrapped
+    """
+    diff = M - m
+    while x > M:
+        x = x - diff
+    while x < m:
+        x = x + diff
+    return x
+
+def wrap_angle(angle):
+    """Wraps an angle in radians to the range [-pi, pi].
+
+    Args:
+        angle: a scalar angle in radians
+    Returns:
+        wrapped_angle: the angle wrapped to the range [-pi, pi]
+    """
+    return (angle + math.pi) % (2 * math.pi) - math.pi
+
 
 def _total_energy(theta1, theta2, d1, d2, m1, m2, l1, lc1, lc2, I1, I2, g=9.81):
     # small helper (matches your conventions)
@@ -165,12 +195,27 @@ def run_single_system(link_length1, link_length2, link_mass1, link_mass2, state_
     # plt.close()
 
     # Save States and controls on one plot
-    plt.figure(figsize=(15, 10))
+    # font parameters for plots
+    parameters = {
+        'font.size': 22,
+        'axes.labelsize': 24,
+        'axes.titlesize': 24,
+        'xtick.labelsize': 22,
+        'ytick.labelsize': 22,
+        'legend.fontsize': 16,
+        'font.family': 'serif'
+    }
+    plt.rcParams.update(parameters)
+    plt.figure(figsize=(10, 10))
     for i in range(4):
         plt.subplot(3, 2, i+1)
-        plt.scatter(range(len(states)), states[:, i], label='Transformer ' + labels[i], color=colors[i], s=10)
+        # if i == 0:
+        #     wrapped_states = np.array([wrap_angle(s[i]) for s in states])
+        #     plt.scatter(range(len(states)), wrapped_states, label='Transformer', color=colors[i], s=10)
+        # else:
+        plt.scatter(range(len(states)), states[:, i], label='Transformer', color=colors[i], s=10)
         if true_state_data is not None and true_ctrl_data is not None:
-            plt.scatter(range(len(true_states)), true_states[:, i], label='Reference ' + labels[i], color='cyan', s=10, alpha=0.5)
+            plt.scatter(range(len(true_states)), true_states[:, i], label='Reference', color='cyan', s=10, alpha=0.5)
         # plt.title(labels[i] + ' Over Time') if true_state_data is None else plt.title(f'Model vs Reference {labels[i]} Over Time (Context: {context})')
         # plt.xlabel('Time Step')
         plt.xlabel('Time Step', fontsize=24)
@@ -180,12 +225,12 @@ def run_single_system(link_length1, link_length2, link_mass1, link_mass2, state_
         plt.yticks(fontsize=22)
         plt.grid()
         # plt.legend()
-        plt.legend(fontsize=16)
+        # plt.legend(fontsize=16)
 
     plt.subplot(3, 2, 5)
-    plt.scatter(range(len(actions)), actions[:,0], label='Transformer Control Actions', color='red', s=10)
+    plt.scatter(range(len(actions)), actions[:,0], label='Transformer', color='red', s=10)
     if true_state_data is not None and true_ctrl_data is not None:
-        plt.scatter(range(len(true_actions)), true_actions[:,0], label='Reference Control Actions', color='cyan', s=10)
+        plt.scatter(range(len(true_actions)), true_actions[:,0], label='Reference', color='cyan', s=10)
     # plt.title('Control Actions Over Time') if true_ctrl_data is None else plt.title(f'Predicted vs Reference Control Actions Over Time (Context: {context})')
     # plt.xlabel('Time Step')
     plt.xlabel('Time Step', fontsize=24)
@@ -195,11 +240,11 @@ def run_single_system(link_length1, link_length2, link_mass1, link_mass2, state_
     plt.yticks(fontsize=22)
     plt.grid()
     # plt.legend()
-    plt.legend(fontsize=16)
+    # plt.legend(fontsize=16)
     plt.subplot(3, 2, 6)
-    plt.scatter(range(len(actions)), actions[:,1] + 1.0, label='Transformer Control Labels', color='red', s=10)
+    plt.scatter(range(len(actions)), actions[:,1] + 1.0, label='Transformer', color='red', s=10)
     if true_state_data is not None and true_ctrl_data is not None:
-        plt.scatter(range(len(true_actions)), true_actions[:,1] + 1.0, label='Reference Control Labels', color='cyan', s=10, alpha=0.5)
+        plt.scatter(range(len(true_actions)), true_actions[:,1] + 1.0, label='Reference', color='cyan', s=10, alpha=0.5)
     # plt.title('Control Labels Over Time') if true_ctrl_data is None else plt.title(f'Predicted vs Reference Control Labels Over Time (Context: {context})')
     # plt.xlabel('Time Step')
     plt.xlabel('Time Step', fontsize=24)
@@ -209,8 +254,33 @@ def run_single_system(link_length1, link_length2, link_mass1, link_mass2, state_
     plt.yticks(fontsize=22)
     plt.grid()
     # plt.legend()
-    plt.legend(fontsize=16)
-    plt.tight_layout()
+    # plt.legend(fontsize=16)
+
+    # 1. Get handles and labels from the FIRST subplot (since they are all the same)
+    # This is much cleaner than looping through all axes
+    handles, labels = plt.gcf().axes[0].get_legend_handles_labels()
+
+    # 2. Use fig.legend to attach it to the whole 20x10 canvas
+    # We place it at the very top or very bottom of the FIGURE
+    fig = plt.gcf()
+    fig.legend(
+        handles, 
+        labels, 
+        loc='lower center', 
+        bbox_to_anchor=(0.5, 0.02),
+        ncol=2, 
+        fontsize=24,
+        markerscale=4.0,     # This multiplies the legend marker size by 4
+        frameon=True, 
+        edgecolor='black'
+    )
+
+    # 3. Adjust layout to leave room for the legend at the bottom
+    # rect=[left, bottom, right, top]
+    plt.tight_layout(rect=[0, 0.08, 1, 1])
+
+
+    # plt.tight_layout()
     # plt.savefig(os.path.join(path, 'states_and_controls.png'))
     plt.savefig(os.path.join(path, 'states_and_controls.pdf'), format='pdf', bbox_inches='tight')
     plt.close()
@@ -232,12 +302,27 @@ def run_single_system(link_length1, link_length2, link_mass1, link_mass2, state_
 
 def load_data(data_path):
     with open(data_path, 'rb') as f:
-        data = pickle.load(f)
+        # data = pickle.load(f)
+            data = CPU_Unpickler(f).load()
         # data = torch.load(data_path, map_location=torch.device('cpu'))
         # b = f.read()
     
     # data = torch.load(io.BytesIO(b), map_location=torch.device('cpu'), weights_only=False)
     return data
+
+import os
+import pickle
+import io
+import os
+
+# 1. Define a helper class to force CPU loading
+class CPU_Unpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
+        return super().find_class(module, name)
+
+
 
 
 if __name__ == "__main__":
@@ -248,7 +333,7 @@ if __name__ == "__main__":
     model_run_id = "efc700a2-0b51-4853-885d-557ba3c9d942" #"aa880853-841e-4b61-a7a7-9a3720482be2" #"e6ca8305-a383-4bc2-9f18-bd258dcc0183" #"15bf641c-dbc0-4f2f-b62f-fe04f568aacb" #"ec03ac2f-4708-4295-a44d-c14d439f7335" #"15bf641c-dbc0-4f2f-b62f-fe04f568aacb" #"d9d1d44a-9942-40b9-a2d4-bfba4177f2ce" ### finetuned lin layers chkpt #"15bf641c-dbc0-4f2f-b62f-fe04f568aacb" #"c953cb49-31b2-4829-8d1e-d9e2b1c99dce" #"056764e2-f56a-4e25-8019-3ce5098c388c" #"b3725997-9aee-4578-b668-d33e7cb29c4e" #"2ca9672c-582e-43ef-85cf-8550f325947a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"cf756e46-3ddb-4df7-9a13-ba850f495257" #"5b73d6c9-b526-4bfe-bab3-005f5369cf5a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"f8211c69-7ae8-47b3-9bd2-e<KEY>"#"de<KEY>" #"<KEY>"#"be<KEY>"#"eb<KEY>"#"a<KEY>"#"a<KEY>"#"<KEY>"#"<KEY>"#"be<KEY>"#"eb<KEY>"#"a<KEY>"#"a<KEY>"#"cf<KEY>"
     save_dir = os.path.join(save_dir, model_run_id)
     # os.makedirs(save_dir, exist_ok=True)
-    step = 60000 #135000 #300000 #135000 #50000 #395000 #230000 #90000 #250000 #90000 #125000 #255000 #260000 #284408 # 237346 #207672 #185000 #80000 #105000 #50000 #55000#274941 #300800
+    step = 300000 #135000 #300000 #135000 #50000 #395000 #230000 #90000 #250000 #90000 #125000 #255000 #260000 #284408 # 237346 #207672 #185000 #80000 #105000 #50000 #55000#274941 #300800
     save_dir = os.path.join(save_dir, f"step_{step}")
     os.makedirs(save_dir, exist_ok=True)
     numberpend = 6 #200 #5
@@ -264,26 +349,28 @@ if __name__ == "__main__":
 
     # for cartpole_idx in range(len(cartmasses)):
     for acrobot_idx in range(len(link_lengths1)):
-        # save_dir_inner = os.path.join(save_dir, f"run_{cartpole_idx:03}")
-        save_dir_inner = os.path.join(save_dir, f"run_{acrobot_idx:03}")
-        print(f"Running acrobot {acrobot_idx+1}/{len(link_lengths1)}")
-        link_length1 = link_lengths1[acrobot_idx]
-        link_length2 = link_lengths2[acrobot_idx]
-        link_mass1 = link_masses1[acrobot_idx]
-        link_mass2 = link_masses2[acrobot_idx]
+        if acrobot_idx == 1:
+            # save_dir_inner = os.path.join(save_dir, f"run_{cartpole_idx:03}")
+            save_dir_inner = os.path.join(save_dir, f"run_{acrobot_idx:03}")
+            print(f"Running acrobot {acrobot_idx+1}/{len(link_lengths1)}")
+            link_length1 = link_lengths1[acrobot_idx]
+            link_length2 = link_lengths2[acrobot_idx]
+            link_mass1 = link_masses1[acrobot_idx]
+            link_mass2 = link_masses2[acrobot_idx]
 
-        # ground_truth_data_controls = data_and_controls[0][acrobot_idx]
-        # state_data = ground_truth_data_controls[0]
-        # ctrl_data = ground_truth_data_controls[1]
+            # ground_truth_data_controls = data_and_controls[0][acrobot_idx]
+            # state_data = ground_truth_data_controls[0]
+            # ctrl_data = ground_truth_data_controls[1]
 
-        # run_single_system(link_mass1, link_mass2, link_length1, link_length2,
-                        #   state_data, ctrl_data, acrobot_idx, save_dir_inner)
-        for i, context in enumerate(phase_data.keys()):
-            ground_truth_data_controls = data_and_controls[0][acrobot_idx]
-            state_data = ground_truth_data_controls[0]
-            ctrl_data = ground_truth_data_controls[1]
-            context_state_data = phase_data[context][acrobot_idx]
-            context_ctrl_data = controls_data[context][acrobot_idx]
-            run_single_system(link_mass1, link_mass2, link_length1, link_length2,
-                              context_state_data, context_ctrl_data, acrobot_idx, save_dir_inner, context=context, true_state_data=state_data, true_ctrl_data=ctrl_data)
+            # run_single_system(link_mass1, link_mass2, link_length1, link_length2,
+                            #   state_data, ctrl_data, acrobot_idx, save_dir_inner)
+            for i, context in enumerate(phase_data.keys()):
+                if context == 50:
+                    ground_truth_data_controls = data_and_controls[0][acrobot_idx]
+                    state_data = ground_truth_data_controls[0]
+                    ctrl_data = ground_truth_data_controls[1]
+                    context_state_data = phase_data[context][acrobot_idx]
+                    context_ctrl_data = controls_data[context][acrobot_idx]
+                    run_single_system(link_mass1, link_mass2, link_length1, link_length2,
+                                    context_state_data, context_ctrl_data, acrobot_idx, save_dir_inner, context=context, true_state_data=state_data, true_ctrl_data=ctrl_data)
             

@@ -21,7 +21,7 @@ import re
 
 
 
-plot_label = 'mse_control'
+plot_label = 'mse_control2'
 phase_plot_label = 'mse_control_phaseplot'
 mse_plot_label = 'mse_control_mseplot'
 save_results = "trainsteps_test_mse_control.txt"
@@ -956,11 +956,11 @@ try:
             _, _, _, _, phase_data, controls_data, data_and_controls, pends = results
         
         
-        save_results = os.path.join(folder_name, f"results_maxcontext{Num_of_context}_numpends{Num_of_pendulums}_{mode}_alexcode.pkl")    
-        # save_results = os.path.join(folder_name, f"results_maxcontext{Num_of_context}_numpends{Num_of_pendulums}_{mode}_alexcode.pkl")
+            save_results = os.path.join(folder_name, f"results_maxcontext{Num_of_context}_numpends{Num_of_pendulums}_{mode}_alexcode.pkl")    
+            # save_results = os.path.join(folder_name, f"results_maxcontext{Num_of_context}_numpends{Num_of_pendulums}_{mode}_alexcode.pkl")
 
-        with open(save_results, "wb") as f:
-            pickle.dump(results, f)
+            with open(save_results, "wb") as f:
+                pickle.dump(results, f)
     
 
 
