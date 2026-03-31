@@ -147,7 +147,7 @@ def train(model, args):
                                 }
                             )
 
-                        if current_step % args.training.save_every_steps == 0 and not args.test_run and current_step < 5000 and local_rank == 0:
+                        if current_step % args.training.save_every_steps == 0 and not args.test_run and current_step <= 5000 and local_rank == 0:
                             training_state = {
                                 "model_state_dict": model.state_dict(),
                                 "optimizer_state_dict": optimizer.state_dict(),
@@ -160,7 +160,7 @@ def train(model, args):
                             checkpoint_path = os.path.join(args.out_dir, f"checkpoint_epoch{epoch+1}_step{current_step}.pt")
                             torch.save(training_state, checkpoint_path)
                             print(f"Checkpoint saved at epoch {epoch+1}, step {current_step}: {checkpoint_path}")
-                        elif current_step % 25000 == 0 and not args.test_run and current_step >= 5000 and local_rank == 0:
+                        elif current_step % 1000 == 0 and not args.test_run and current_step >= 5000 and local_rank == 0:
                             training_state = {
                                 "model_state_dict": model.state_dict(),
                                 "optimizer_state_dict": optimizer.state_dict(),
@@ -318,10 +318,12 @@ def validate(model, args):
     for xs, ys, cartmass, polemass, polelength in id_loader:
         with torch.no_grad():
             xs, ys = xs[:, :120, :], ys[:, :120, :]
+            
             xs_cos_tensor = torch.cos(xs[:, :, 2])
             xs_sin_tensor = torch.sin(xs[:, :, 2])
             xs = torch.cat((xs[:, :, :2], xs_cos_tensor.unsqueeze(-1), xs_sin_tensor.unsqueeze(-1), xs[:, :, 3:]), dim=-1)
 
+            # Normalizing Data
             state_max_scale = [7.0, 8.0, 1.0, 1.0, 5.0]
             control_max_scale = 15.0
             xs_sc = xs / torch.tensor(state_max_scale, device=xs.device)
@@ -329,16 +331,20 @@ def validate(model, args):
             ys_sc_for_model = ys_sc.clone()
             ys_sc_for_model[..., 1] = ys_sc_for_model[..., 1] + 1 # -1, 0, 1 -> 0, 1, 2
 
+            # Assume controller is off before simulation begins (a_0 = 0.0, m_0 = 0)
             ys_sc_for_model = torch.cat((torch.zeros((ys_sc_for_model.shape[0], 1, 2), device=ys_sc_for_model.device), ys_sc_for_model), dim=1)
 
+            # Forward Pass
             s, m, a = xs_sc[:, :-1, :], ys_sc_for_model[:, :-2, 1].unsqueeze(-1), ys_sc_for_model[:, :-2, 0].unsqueeze(-1)
+            # (s1, m0, a0), (s2, m1, a1), ... , (s119, m118, a118)
             s_pred, m_logits, a_pred = model(s, m, a)
+            # (s2, m1, a1), (s3, m2, a2), ... , (s120, m119, a119)
 
             # Mask for Zero-Dynamics Indices (assuming label at idx 1 and -1 means zero-dynamics)
             zero_dyn_mask = ys_sc[..., 1] == -1  
             zero_dyn_mask = zero_dyn_mask.unsqueeze(-1)
 
-            # Control Input Regression Loss
+            # Control Input Regression MSE Loss (mask is used so that predicted actions during zero-dynamics timesteps are not penalized)
             ys_sc = ys_sc.to(a_pred.device)
             raw_mse = (a_pred.squeeze(-1) - ys_sc[:, :-1, 0]).pow(2) 
             active_mask = (~zero_dyn_mask[:, :-1].squeeze(-1)).float().to(raw_mse.device)  
@@ -353,7 +359,6 @@ def validate(model, args):
             mode_logits_flat = m_logits.reshape(-1, 3)
             target_modes_flat = target_modes.reshape(-1)
             loss_switch = nn.CrossEntropyLoss()(mode_logits_flat, target_modes_flat) 
-
 
             # Total Loss
             alpha_controls = 1.0

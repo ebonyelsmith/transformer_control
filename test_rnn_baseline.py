@@ -30,7 +30,7 @@ save_results = "trainsteps_test_mse_control.txt"
 save_phase_plot = "trainsteps_test_mse_control.txt"
 log_info = "trainsteps_log_mse_control.txt"
 model_name= "cartpole_rnn"
-model_run_id= "three_layer_lstm_v3_h1024_e256_dropout" 
+model_run_id= "three_layer_lstm_v3_h1024_e256_dropout_retrain" 
 
 model_config = {'n_dims': {'state': 5, 'distance': 1, 'mode': 3,'control': 1},
                 'hidden_size': 1024,
@@ -45,7 +45,7 @@ model = RNNModel(n_dims=model_config['n_dims'],
                     n_embd=model_config['n_embd'])
 
 model_checkpoint_epoch = 1 #25 #59 #125 #14 #38 #60 #125
-mode = 'ood' # 'indistr', 'ood', 'train' 
+mode = 'indistr' # 'indistr', 'ood', 'train' 
     
 
 total_time = 14 #4 #5 #1.5
@@ -537,7 +537,8 @@ def main(model,
     return cartmasses, polemasses, polelenghs, phase_data, controls_data, data_and_controls, pends
 
 try:
-    model_checkpoint_step_list = [4800, 25000, 50000, 75000, 100000, 200000]
+    # model_checkpoint_step_list = [5000, 10000, 12000, 15000, 17000, 20000]
+    model_checkpoint_step_list = [10000, 17000]
     Num_of_contexts = [1, 5, 10, 25, 50]
 
     for step in tqdm(model_checkpoint_step_list, desc="Checkpoint Steps"):
