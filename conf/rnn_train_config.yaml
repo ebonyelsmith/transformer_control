@@ -8,9 +8,9 @@ model:
             'distance': 1,
             'mode': 3,
             'control': 1}
-    num_layers: 3
+    num_layers: 2
     cell_type: 'lstm'
-    hidden_size: 512
+    hidden_size: 1024
     n_embd: 256
 
 training:

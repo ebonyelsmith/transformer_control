@@ -35,7 +35,7 @@ torch.manual_seed(42)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(42)
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 torch.backends.cudnn.benchmark = True
 
 def train(model, args):
@@ -50,7 +50,6 @@ def train(model, args):
     state_path = os.path.join(args.out_dir, "state.pt")
     dataset_folder = args.dataset_filesfolder
     picklefolder = args.pickle_folder
-    testpicklefolder = args.pickle_folder_test
     fullpicklepath = os.path.join(dataset_folder, picklefolder)
 
     # Hyperparameters
@@ -89,14 +88,19 @@ def train(model, args):
 
                 # Batch from chunk
                 xs_tensor, ys_tensor, cartmasses, polemasses, polelengths = dataset_full[0]
-                xs_tensor = xs_tensor.to("cpu")
-                ys_tensor = ys_tensor.to("cpu")
                 cartmasses_tensor = torch.tensor(np.array(cartmasses), device=xs_tensor.device)
                 polemasses_tensor = torch.tensor(np.array(polemasses), device=xs_tensor.device)
                 polelengths_tensor = torch.tensor(np.array(polelengths), device=xs_tensor.device)
 
                 # Preprocessing
                 xs_tensor, ys_tensor, cartmasses_tensor, polemasses_tensor, polelengths_tensor = preprocess(xs_tensor, ys_tensor, cartmasses_tensor, polemasses_tensor, polelengths_tensor)
+                
+                xs_tensor = xs_tensor.to("cpu")
+                ys_tensor = ys_tensor.to("cpu")
+                cartmasses_tensor = cartmasses_tensor.to("cpu")
+                polemasses_tensor = polemasses_tensor.to("cpu")
+                polelengths_tensor = polelengths_tensor.to("cpu")
+
                 dataset_full = TensorDataset(xs_tensor, ys_tensor, cartmasses_tensor, polemasses_tensor, polelengths_tensor)
                 segmented_dataset = SegmentedCartpoleDataset(dataset_full, window_size=120)
 
@@ -107,8 +111,6 @@ def train(model, args):
                     for xs, ys, _, _, _ in dataloader:
                         # xs [b, 120, 5], ys [b, 120, 2]
                         loss, loss_a, loss_s, loss_m, _, grad_norm, prev_grad_norm = train_step(model, xs, ys, optimizer, loss_func, current_step, args, num_training_steps) 
-
-                        
                         lr_scheduler.step()
                         curriculum.update()
                         current_step += 1
@@ -144,7 +146,7 @@ def train(model, args):
                                     "grad_norm": grad_norm,
                                 }
                             )
-                        
+
                         if current_step % args.training.save_every_steps == 0 and not args.test_run and current_step < 5000 and local_rank == 0:
                             training_state = {
                                 "model_state_dict": model.state_dict(),
@@ -158,7 +160,6 @@ def train(model, args):
                             checkpoint_path = os.path.join(args.out_dir, f"checkpoint_epoch{epoch+1}_step{current_step}.pt")
                             torch.save(training_state, checkpoint_path)
                             print(f"Checkpoint saved at epoch {epoch+1}, step {current_step}: {checkpoint_path}")
-                        
                         elif current_step % 25000 == 0 and not args.test_run and current_step >= 5000 and local_rank == 0:
                             training_state = {
                                 "model_state_dict": model.state_dict(),
@@ -172,7 +173,7 @@ def train(model, args):
                             checkpoint_path = os.path.join(args.out_dir, f"checkpoint_epoch{epoch+1}_step{current_step}.pt")
                             torch.save(training_state, checkpoint_path)
                             print(f"Checkpoint saved at epoch {epoch+1}, step {current_step}: {checkpoint_path}")
-                        
+                
                 # Cleanup
                 print(f"Chunk {chunk_idx + 1}/{num_chunks} finished. unloading dataset from memory...")
                 del dataset_full
@@ -198,8 +199,11 @@ def train(model, args):
     print(f"Final Checkpoint saved at epoch {epoch+1}, step {current_step}: {checkpoint_path}")              
 
 def train_step(model, xs, ys, optimizer, state_loss, current_step, args, num_training_steps):
+    # s1, a0, m0       -> s2, a1, m1
+    # st-1, at-2, mt-2 -> st, at-1, mt-1 
     optimizer.zero_grad()
-    
+    xs, ys = xs.cuda(), ys.cuda()
+
     # Normalizing Data
     state_max_scale = [7.0, 8.0, 1.0, 1.0, 5.0]
     control_max_scale = 15.0
@@ -208,9 +212,14 @@ def train_step(model, xs, ys, optimizer, state_loss, current_step, args, num_tra
     ys_sc_for_model = ys_sc.clone()
     ys_sc_for_model[..., 1] = ys_sc_for_model[..., 1] + 1 # -1, 0, 1 -> 0, 1, 2
 
+    # Assume controller is off before simulation begins (a_0 = 0.0, m_0 = 0)
+    ys_sc_for_model = torch.cat((torch.zeros((ys_sc_for_model.shape[0], 1, 2), device=ys_sc_for_model.device), ys_sc_for_model), dim=1)
+
     # Forward Pass
-    s, m, a = xs_sc, ys_sc_for_model[..., 1].unsqueeze(-1), ys_sc_for_model[..., 0].unsqueeze(-1)
+    s, m, a = xs_sc[:, :-1, :], ys_sc_for_model[:, :-2, 1].unsqueeze(-1), ys_sc_for_model[:, :-2, 0].unsqueeze(-1)
+    # (s1, m0, a0), (s2, m1, a1), ... , (s119, m118, a118)
     s_pred, m_logits, a_pred = model(s, m, a)
+    # (s2, m1, a1), (s3, m2, a2), ... , (s120, m119, a119)
 
     # Mask for Zero-Dynamics Indices (assuming label at idx 1 and -1 means zero-dynamics)
     zero_dyn_mask = ys_sc[..., 1] == -1  
@@ -218,19 +227,19 @@ def train_step(model, xs, ys, optimizer, state_loss, current_step, args, num_tra
 
     # Control Input Regression MSE Loss (mask is used so that predicted actions during zero-dynamics timesteps are not penalized)
     ys_sc = ys_sc.to(a_pred.device)
-    raw_mse = (a_pred.squeeze(-1)[:,:-1] - ys_sc[:, :-1, 0]).pow(2)
+    raw_mse = (a_pred.squeeze(-1) - ys_sc[:, :-1, 0]).pow(2) 
     active_mask = (~zero_dyn_mask[:, :-1].squeeze(-1)).float().to(raw_mse.device)  
     loss_controls = (raw_mse * active_mask).sum() / (active_mask.sum()+1e-8)
 
     # State Regression Loss
     xs_sc = xs_sc.to(s_pred.device)
-    loss_states = state_loss(s_pred[:,:-1], xs_sc[:,1:]) # s_pred[:, t, :] ~ xs_sc[:, t+1, :]
+    loss_states = state_loss(s_pred, xs_sc[:,1:]) 
 
     # Mode Classification Cross-Entropy Loss
     target_modes = (ys_sc[:, :-1, 1] + 1).long()
-    mode_logits_flat = m_logits[:, :-1, :].reshape(-1, 3)
+    mode_logits_flat = m_logits.reshape(-1, 3)
     target_modes_flat = target_modes.reshape(-1)
-    loss_switch = nn.CrossEntropyLoss()(mode_logits_flat, target_modes_flat)
+    loss_switch = nn.CrossEntropyLoss()(mode_logits_flat, target_modes_flat) 
 
     # Total Loss
     alpha_controls = 1.0
@@ -300,7 +309,7 @@ def validate(model, args):
 
     state_loss = getattr(tasks, args.loss, None)
     id_data_dir = os.path.join(args.dataset_filesfolder, args.pickle_folder_test)
-    pickle_file = os.path.join(id_data_dir, 'batch_test_0_1.pkl')
+    pickle_file = os.path.join(id_data_dir, 'batch_test_0_25.pkl')
     with open(pickle_file, 'rb') as file:
         id_data = pickle.load(file)
 
@@ -320,22 +329,31 @@ def validate(model, args):
             ys_sc_for_model = ys_sc.clone()
             ys_sc_for_model[..., 1] = ys_sc_for_model[..., 1] + 1 # -1, 0, 1 -> 0, 1, 2
 
-            s, m, a = xs_sc, ys_sc_for_model[..., 1].unsqueeze(-1), ys_sc_for_model[..., 0].unsqueeze(-1)
+            ys_sc_for_model = torch.cat((torch.zeros((ys_sc_for_model.shape[0], 1, 2), device=ys_sc_for_model.device), ys_sc_for_model), dim=1)
+
+            s, m, a = xs_sc[:, :-1, :], ys_sc_for_model[:, :-2, 1].unsqueeze(-1), ys_sc_for_model[:, :-2, 0].unsqueeze(-1)
             s_pred, m_logits, a_pred = model(s, m, a)
+
+            # Mask for Zero-Dynamics Indices (assuming label at idx 1 and -1 means zero-dynamics)
+            zero_dyn_mask = ys_sc[..., 1] == -1  
+            zero_dyn_mask = zero_dyn_mask.unsqueeze(-1)
 
             # Control Input Regression Loss
             ys_sc = ys_sc.to(a_pred.device)
-            loss_controls = (a_pred.squeeze(-1)[:,:-1] - ys_sc[:, :-1, 0]).pow(2).mean()
+            raw_mse = (a_pred.squeeze(-1) - ys_sc[:, :-1, 0]).pow(2) 
+            active_mask = (~zero_dyn_mask[:, :-1].squeeze(-1)).float().to(raw_mse.device)  
+            loss_controls = (raw_mse * active_mask).sum() / (active_mask.sum()+1e-8)
 
             # State Regression Loss
             xs_sc = xs_sc.to(s_pred.device)
-            loss_states = state_loss(s_pred[:,:-1], xs_sc[:,1:]) # s_pred[:, t, :] ~ xs_sc[:, t+1, :]
+            loss_states = state_loss(s_pred, xs_sc[:,1:]) 
 
             # Mode Classification Cross-Entropy Loss
             target_modes = (ys_sc[:, :-1, 1] + 1).long()
-            mode_logits_flat = m_logits[:, :-1, :].reshape(-1, 3)
+            mode_logits_flat = m_logits.reshape(-1, 3)
             target_modes_flat = target_modes.reshape(-1)
-            loss_switch = nn.CrossEntropyLoss()(mode_logits_flat, target_modes_flat)
+            loss_switch = nn.CrossEntropyLoss()(mode_logits_flat, target_modes_flat) 
+
 
             # Total Loss
             alpha_controls = 1.0
@@ -354,6 +372,10 @@ def validate(model, args):
     id_state_loss /= total_samples_id
     id_control_loss /= total_samples_id
     id_mode_loss /= total_samples_id
+
+    del id_data
+    torch.cuda.empty_cache()
+    gc.collect()
 
     model.train()
     return id_loss, id_state_loss, id_control_loss, id_mode_loss
