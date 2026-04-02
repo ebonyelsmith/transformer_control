@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 # import workCon_linearsys as workCon
 import workCon_acrobot_aigym as workCon
 # import os
-from eval import get_model_from_run
+from eval_copy import get_model_from_run
 from tqdm import tqdm
 import ipdb
 import traceback
@@ -21,7 +21,7 @@ import re
 
 
 
-plot_label = 'mse_control'
+plot_label = 'mse_control2'
 phase_plot_label = 'mse_control_phaseplot'
 mse_plot_label = 'mse_control_mseplot'
 save_results = "trainsteps_test_mse_control.txt"
@@ -29,7 +29,7 @@ save_phase_plot = "trainsteps_test_mse_control.txt"
 log_info = "trainsteps_log_mse_control.txt"
 model_name= "acrobot_cos_sin_theta"
 # model_name = "cartpole_cos_sin_theta_finetune_layer"  #finetuned with acrobot data
-model_run_id= "aa880853-841e-4b61-a7a7-9a3720482be2" #"e6ca8305-a383-4bc2-9f18-bd258dcc0183" #"15bf641c-dbc0-4f2f-b62f-fe04f568aacb" #"ec03ac2f-4708-4295-a44d-c14d439f7335" ### finetuned last 2 layers #"d9d1d44a-9942-40b9-a2d4-bfba4177f2ce" ### finetuned chkpt #"15bf641c-dbc0-4f2f-b62f-fe04f568aacb" #"c953cb49-31b2-4829-8d1e-d9e2b1c99dce" #"056764e2-f56a-4e25-8019-3ce5098c388c"
+model_run_id= "efc700a2-0b51-4853-885d-557ba3c9d942" #"aa880853-841e-4b61-a7a7-9a3720482be2" #"e6ca8305-a383-4bc2-9f18-bd258dcc0183" #"15bf641c-dbc0-4f2f-b62f-fe04f568aacb" #"ec03ac2f-4708-4295-a44d-c14d439f7335" ### finetuned last 2 layers #"d9d1d44a-9942-40b9-a2d4-bfba4177f2ce" ### finetuned chkpt #"15bf641c-dbc0-4f2f-b62f-fe04f568aacb" #"c953cb49-31b2-4829-8d1e-d9e2b1c99dce" #"056764e2-f56a-4e25-8019-3ce5098c388c"
 # model_checkpoint_step= 90000 #30000 #260000 #284408 #195000 #237346 #207672 #185000 #80000 #105000 #50000 #55000 #274941 #195000 #5000 #15000 #274941 #115000 #300800 #204800 #102400
 model_checkpoint_epoch = 1 #25 #59 #125 #14 #38 #60 #125
 # folder_name = f"inference_run/{plot_label}_{model_checkpoint_step}_{model_run_id}"
@@ -37,12 +37,12 @@ mode = 'indistr' # 'train', 'ood', 'indistr'
 
     
 
-total_time = 12 #11.2 #12 #16 #4 #5 #1.5
+total_time = 70 #12 #11.2 #12 #16 #4 #5 #1.5
 dt = 0.02
-Num_of_context = 50 #150
-Num_of_pendulums = 11 #10 #200 #1 #10 #20 #40 #10
-start_index_num = [Num_of_context]
-num_pts = int(total_time/dt)
+# Num_of_context = 50 #150
+Num_of_pendulums = 100 #6 #10 #200 #1 #10 #20 #40 #10
+# start_index_num = [Num_of_context]
+# num_pts = int(total_time/dt)
 
 
 
@@ -375,11 +375,14 @@ def run_inference_on_model(model, XData, YS, total_time, device, dt=0.01, contex
             xs = xs / torch.tensor(states_scale, device=device)
             ys = YS_context[start_index - context:]
             ys = ys / torch.tensor([control_scale, 1.0], device=device)
+            ys_for_model = ys.clone()
+            # add 1 to switch labels so that 0 becomes 1, 1 becomes 2, and 2 becomes 3 (0: zero dynamics, 1: swing up, 2: lqr)
+            ys_for_model[:, 1] = ys_for_model[:, 1] + 1.0
             # ys[:, 0] = torch.sign(ys[:, 0]) * torch.sqrt(torch.abs(ys[:, 0]) + 1e-8)
             # import pdb; pdb.set_trace()
             # print(f"xs shape: {xs.shape}, ys shape: {ys.shape}")
             # u_pred, state_pred = model(xs, ys, inf = "yes") # 7/18/2025
-            u_pred, state_pred, flag_pred = model(xs, ys, inf = "yes") # 7/18/2025
+            u_pred, state_pred, flag_pred = model(xs, ys_for_model, inf = "yes") # 7/18/2025
             # u_pred, state_pred = model(XData_context[start_index - context:], YS_context[start_index - context:], inf = "yes")
             # u_pred = model(XData_context_scaled, YS_context_scaled, inf = "yes")
             # u = u_pred[0][-2].cpu().numpy()
@@ -387,9 +390,19 @@ def run_inference_on_model(model, XData, YS, total_time, device, dt=0.01, contex
             # u = u_pred[0][-1][0]
             # u_with_label = u_pred[0][-1]
             flag_pred = flag_pred[0][-1] # 7/18/2025
-            flag_prob = torch.sigmoid(flag_pred) # 7/24/2025
+            flag_pred = torch.argmax(flag_pred) - 1
+            if i >= context:
+                # If the model is stuck in 'identification' mode (-1) 
+                # but we are past the context window, force it to 'swing-up' (0)
+                if flag_pred == -1:
+                    actual_mode_to_use = torch.tensor(0, device=device)
+                else:
+                    actual_mode_to_use = flag_pred
+            else:
+                actual_mode_to_use = torch.tensor(-1, device=device)
+            # flag_prob = torch.sigmoid(flag_pred) # 7/24/2025
             # flag_pred = 1 if flag_pred > 0.5 else 0
-            flag_pred = (flag_prob > 0.5).int() #.float() # 7/24/2025
+            # flag_pred = (flag_prob > 0.5).int() #.float() # 7/24/2025
 
             # if switch == 1:
             #     flag_pred = torch.tensor([1.0], device=device)
@@ -401,7 +414,8 @@ def run_inference_on_model(model, XData, YS, total_time, device, dt=0.01, contex
 
             
             # import pdb; pdb.set_trace()
-            u_with_label = torch.cat((u.unsqueeze(0) * control_scale, flag_pred.unsqueeze(0)), dim=0) # 7/18/2025
+            u_with_label = torch.cat((u * control_scale, actual_mode_to_use.unsqueeze(0)), dim=0) 
+            # u_with_label = torch.cat((u.unsqueeze(0) * control_scale, flag_pred.unsqueeze(0)), dim=0) # 7/18/2025
             # u_with_label0 = torch.sign(u) * u.pow(2) # 2/23/2026
             # u_with_label = torch.cat((u_with_label0.unsqueeze(0), flag_pred.unsqueeze(0)), dim=0) # 7/18/2025
             u_with_label = u_with_label.squeeze(-1)
@@ -583,13 +597,7 @@ def phase_plot(theta_plot, thetadot_plot, theta_rk4_unscaled, save_results_path,
 
     return plot_path
 
-# Each plot will now be saved with a randomly generated unique identifier.
 
-
-# Now each plot will be saved uniquely by specifying plot_index.
-
-
-# Ready to plot when you provide your data.
 
 
 def get_mass_length_Ks_from_text_file(file_path, target_iteration):
@@ -640,14 +648,22 @@ def get_mass_length_Ks_from_text_file(file_path, target_iteration):
 
 
 # def main()
-def main(chkpt_step, folder_name):
+# def main(chkpt_step, folder_name):
+def main(
+        chkpt_step, folder_name,
+        number_of_context,
+        phase_data,
+        controls_data,
+        data_and_controls,
+        ):
     """_summary_
     """
     model, _ = load_model(
         run_dir="./models",
         name= model_name,
         run_id= model_run_id,
-        step=model_checkpoint_step,
+        # step=model_checkpoint_step,
+        step=chkpt_step,
         epoch=model_checkpoint_epoch ###### 2/11/2025 (ebonye): added epoch
     )
 
@@ -661,7 +677,7 @@ def main(chkpt_step, folder_name):
     # start_indices = [Num_of_context]
     # contexts = np.arange(1, Num_of_context + 1)
     # contexts = [1, 10, 20, 30, 40, 50]
-    contexts = [1, 5, 10, 30, 60, 120]
+    # contexts = [1, 5, 10, 30, 60, 120]
 
     
 
@@ -681,7 +697,8 @@ def main(chkpt_step, folder_name):
         # base_dir = f"/data/esmith/Dataset_Cartpole_ICL/picklefolder_test_outofdistr"
         # pickle_file = "batch_test_outofdistr_0.pkl"
         base_dir = f"/data/esmith/Dataset_Acrobot_AIGymWithNoiseShorter_ICL/picklefolder_test_outofdistr"
-        pickle_file = "batch_test_1.pkl"
+        # pickle_file = "batch_test_1.pkl"
+        pickle_file = f"batch_test_0_{number_of_context}.pkl"
     elif mode == 'indistr':
         # base_dir = f"/data/esmith/Dataset_LinearSystem_ICL/picklefolder_test_indistr"
         # base_dir = f"/data/esmith/Dataset_ConstantLinearSystem_ICL/picklefolder_test_indistr"
@@ -690,7 +707,7 @@ def main(chkpt_step, folder_name):
         # base_dir = f"/data/esmith/Dataset_Cartpole_AIGym_ICL/picklefolder_test_indistr"
         # base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL/picklefolder_test_indistr"
         base_dir = f"/data/esmith/Dataset_Acrobot_AIGymWithNoiseShorter_ICL/picklefolder_test_indistr"
-        pickle_file = "batch_test_0.pkl"
+        pickle_file = f"batch_test_0_{number_of_context}.pkl"
     elif mode == 'train':
         # base_dir = f"/data/esmith/Dataset_LinearSystem_ICL/picklefolder"
         # base_dir = f"/data/esmith/Dataset_ConstantLinearSystem_ICL/picklefolder"
@@ -734,7 +751,8 @@ def main(chkpt_step, folder_name):
 
     # all_pends = torch.where(mask)[0].cpu().numpy()  # Get indices of pendulums that meet the goal state condition
     # pends = np.random.choice(all_pends, size=Num_of_pendulums, replace=False)  # Randomly select pendulums from those that meet the goal state condition
-    pends = np.random.randint(0, len(xs), size=Num_of_pendulums)
+    # pends = np.random.randint(0, len(xs), size=Num_of_pendulums)
+    pends = np.arange(Num_of_pendulums)
 
     # import pdb; pdb.set_trace()
 
@@ -760,10 +778,10 @@ def main(chkpt_step, folder_name):
    
     
     with open(log_info_path, "w") as file:
-        mse_results = {context_length: [] for context_length in contexts}
-        mse_control_results = {context_length: [] for context_length in contexts}
-        phase_data = {context_length: [] for context_length in contexts}
-        controls_data = {context_length: [] for context_length in contexts}
+        # mse_results = {context_length: [] for context_length in contexts}
+        # mse_control_results = {context_length: [] for context_length in contexts}
+        # phase_data = {context_length: [] for context_length in contexts}
+        # controls_data = {context_length: [] for context_length in contexts}
         counter = 0
         
         # for cartmass, polemass, polelength in tqdm(zip(cartmasses, polemasses, polelenghs), desc="Cartpole", total=len(cartmasses), leave=False):
@@ -771,8 +789,8 @@ def main(chkpt_step, folder_name):
             # X0 = generate_random_X0()
             # X0 = [ 1.0852e+00, -1.3760e+00]
             # X0 = [1.4575, 0.1397]
-            mse_per_context = []
-            mse_control_per_context = []
+            # mse_per_context = []
+            # mse_control_per_context = []
             
             # x_rk4 = states[counter][:, 0]
             # theta_rk4 = states[counter][:, 2]
@@ -785,14 +803,11 @@ def main(chkpt_step, folder_name):
             control_values_rk4 = controls[counter]
 
             
-            
-
-            
-
             # xs_dataset = np.column_stack((x1_rk4, x2_rk4))
             # xs_dataset = np.column_stack((x_rk4, theta_rk4, xdot_rk4, thetadot_rk4))
             # xs_dataset = np.column_stack((x_rk4, xdot_rk4, theta_rk4, thetadot_rk4))
-            xs_dataset = np.column_stack((theta1_rk4[:num_pts], theta2_rk4[:num_pts], thetadot1_rk4[:num_pts], thetadot2_rk4[:num_pts]))  # 7/26/2025
+            # xs_dataset = np.column_stack((theta1_rk4[:num_pts], theta2_rk4[:num_pts], thetadot1_rk4[:num_pts], thetadot2_rk4[:num_pts]))  # 7/26/2025
+            xs_dataset = np.column_stack((theta1_rk4, theta2_rk4, thetadot1_rk4, thetadot2_rk4)) 
             # xs_dataset = torch.tensor(xs_dataset).float().cuda()
             xs_dataset = torch.tensor(xs_dataset).float().to(device)
             # control_values_rk4 = torch.tensor(control_values_rk4).float().cuda()
@@ -809,95 +824,95 @@ def main(chkpt_step, folder_name):
 
            
 
-            control_values_scaled = control_values_rk4[:num_pts]
+            control_values_scaled = control_values_rk4
             states_scaled = xs_dataset
             
             ######
 
             # import pdb; pdb.set_trace()
-            for context in tqdm(contexts, desc="Context Loop", leave=False):
-                # file.write(f"  Start Index: {start_index}\n")
-                # theta_rk4_temp = theta_rk4[start_index-1:]
-                # thetadot_rk4_temp = thetadot_rk4[start_index-1:]
-                start_index = context
+            # for context in tqdm(contexts, desc="Context Loop", leave=False):
+            # file.write(f"  Start Index: {start_index}\n")
+            # theta_rk4_temp = theta_rk4[start_index-1:]
+            # thetadot_rk4_temp = thetadot_rk4[start_index-1:]
+            start_index = number_of_context
 
-                # x1_rk4_temp = x1_rk4[context:]
-                # x2_rk4_temp = x2_rk4[context:]
-                # x_rk4_temp = x_rk4[context:]
-                # theta_rk4_temp = theta_rk4[context:]
-                # xdot_rk4_temp = xdot_rk4[context:]
-                # thetadot_rk4_temp = thetadot_rk4[context:]
-                theta1_rk4_temp = theta1_rk4[context:]
-                theta2_rk4_temp = theta2_rk4[context:]
-                thetadot1_rk4_temp = thetadot1_rk4[context:]
-                thetadot2_rk4_temp = thetadot2_rk4[context:]
-                controls_rk4_temp = control_values_rk4[context:]
+            # x1_rk4_temp = x1_rk4[context:]
+            # x2_rk4_temp = x2_rk4[context:]
+            # x_rk4_temp = x_rk4[context:]
+            # theta_rk4_temp = theta_rk4[context:]
+            # xdot_rk4_temp = xdot_rk4[context:]
+            # thetadot_rk4_temp = thetadot_rk4[context:]
+            theta1_rk4_temp = theta1_rk4[number_of_context:]
+            theta2_rk4_temp = theta2_rk4[number_of_context:]
+            thetadot1_rk4_temp = thetadot1_rk4[number_of_context:]
+            thetadot2_rk4_temp = thetadot2_rk4[number_of_context:]
+            controls_rk4_temp = control_values_rk4[number_of_context:]
 
-                
-                # T_model, x_model2, theta_model2, xdot_model2, thetadot_model2, controls_model2 = run_inference_on_model(
-                #     model, xs_dataset, control_values_rk4, total_time, device, dt,
-                #     context=context, start_index=start_index, cartmass=cartmass, polemass=polemass, polelength=polelength
-                # )   
-                T_model, theta1_model2, theta2_model2, thetadot1_model2, thetadot2_model2, controls_model2 = run_inference_on_model(
-                    model, xs_dataset, control_values_rk4, total_time, device, dt,
-                    context=context, start_index=start_index, l1=linklength1, l2=linklength2, m1=linkmass1, m2=linkmass2
-                )
+            
+            # T_model, x_model2, theta_model2, xdot_model2, thetadot_model2, controls_model2 = run_inference_on_model(
+            #     model, xs_dataset, control_values_rk4, total_time, device, dt,
+            #     context=context, start_index=start_index, cartmass=cartmass, polemass=polemass, polelength=polelength
+            # )   
+            T_model, theta1_model2, theta2_model2, thetadot1_model2, thetadot2_model2, controls_model2 = run_inference_on_model(
+                model, xs_dataset, control_values_rk4, total_time, device, dt,
+                context=number_of_context, start_index=start_index, l1=linklength1, l2=linklength2, m1=linkmass1, m2=linkmass2
+            )
 
-                # trajectory = torch.stack([x_model2, theta_model2, xdot_model2, thetadot_model2], axis=1)
-                # trajectory = torch.stack([x_model2, xdot_model2, theta_model2, thetadot_model2], axis=1)  # 7/26/2025
-                trajectory = torch.stack([theta1_model2, theta2_model2, thetadot1_model2, thetadot2_model2], axis=1)  # 9/16/2025
-                controls_for_trajectory = controls_model2
-                phase_data[context].append(trajectory)
-                # import pdb; pdb.set_trace()
-                controls_data[context].append(controls_for_trajectory)
-                
+            # trajectory = torch.stack([x_model2, theta_model2, xdot_model2, thetadot_model2], axis=1)
+            # trajectory = torch.stack([x_model2, xdot_model2, theta_model2, thetadot_model2], axis=1)  # 7/26/2025
+            trajectory = torch.stack([theta1_model2, theta2_model2, thetadot1_model2, thetadot2_model2], axis=1)  # 9/16/2025
+            controls_for_trajectory = controls_model2
+            phase_data[number_of_context].append(trajectory)
+            # import pdb; pdb.set_trace()
+            controls_data[number_of_context].append(controls_for_trajectory)
+            
 
-                
+            
 
-                # x_plot.append(x_model2)
-                # theta_plot.append(theta_model2)
-                # xdot_plot.append(xdot_model2)
-                # thetadot_plot.append(thetadot_model2)
-                theta1_plot.append(theta1_model2)
-                theta2_plot.append(theta2_model2)
-                thetadot1_plot.append(thetadot1_model2)
-                thetadot2_plot.append(thetadot2_model2)
-                
-                # state_pred_context = torch.stack([x_model2[context:], theta_model2[context:], xdot_model2[context:], thetadot_model2[context:]], dim=1)
-                # state_pred_context = torch.stack([x_model2[context:], xdot_model2[context:], theta_model2[context:], thetadot_model2[context:]], dim=1)  # 7/26/2025
-                state_pred_context = torch.stack([theta1_model2[context:], theta2_model2[context:], thetadot1_model2[context:], thetadot2_model2[context:]], dim=1)  # 9/16/2025
-                # state_rk4_context = torch.stack([xs_dataset[context:, 0], xs_dataset[context:, 1], xs_dataset[context:, 2], xs_dataset[context:, 3]], dim=1)
-                state_rk4_context = torch.stack([xs_dataset[context:, 0], xs_dataset[context:, 1], xs_dataset[context:, 2], xs_dataset[context:, 3]], dim=1)
-                mse_loss = mse(state_pred_context, state_rk4_context, device)
-                print("mse_loss",mse_loss)
-                mse_per_context.append(mse_loss)
+            # x_plot.append(x_model2)
+            # theta_plot.append(theta_model2)
+            # xdot_plot.append(xdot_model2)
+            # thetadot_plot.append(thetadot_model2)
+            theta1_plot.append(theta1_model2)
+            theta2_plot.append(theta2_model2)
+            thetadot1_plot.append(thetadot1_model2)
+            thetadot2_plot.append(thetadot2_model2)
+            
+            # state_pred_context = torch.stack([x_model2[context:], theta_model2[context:], xdot_model2[context:], thetadot_model2[context:]], dim=1)
+            # state_pred_context = torch.stack([x_model2[context:], xdot_model2[context:], theta_model2[context:], thetadot_model2[context:]], dim=1)  # 7/26/2025
+            # state_pred_context = torch.stack([theta1_model2[context:], theta2_model2[context:], thetadot1_model2[context:], thetadot2_model2[context:]], dim=1)  # 9/16/2025
+            # state_rk4_context = torch.stack([xs_dataset[context:, 0], xs_dataset[context:, 1], xs_dataset[context:, 2], xs_dataset[context:, 3]], dim=1)
+            # state_rk4_context = torch.stack([xs_dataset[context:, 0], xs_dataset[context:, 1], xs_dataset[context:, 2], xs_dataset[context:, 3]], dim=1)
+            # mse_loss = mse(state_pred_context, state_rk4_context, device)
+            # print("mse_loss",mse_loss)
+            # mse_per_context.append(mse_loss)
 
-                # import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
 
-                # phase_plot(theta_plot,thetadot_plot,theta_rk4_unscaled, save_results_path, folder_name)
+            # phase_plot(theta_plot,thetadot_plot,theta_rk4_unscaled, save_results_path, folder_name)
 
-                # mse_control_loss = mse_controls(controls_model2[start_index-1:], control_values_rk4[start_index-1:-1], device)
-                mse_control_loss = mse_controls(controls_model2[context-1:], control_values_scaled[context-1:-1], device)
-                print("mse_control_loss",mse_control_loss)
-                mse_control_per_context.append(mse_control_loss)
-                
+            # mse_control_loss = mse_controls(controls_model2[start_index-1:], control_values_rk4[start_index-1:-1], device)
+            # mse_control_loss = mse_controls(controls_model2[context-1:], control_values_scaled[context-1:-1], device)
+            # print("mse_control_loss",mse_control_loss)
+            # mse_control_per_context.append(mse_control_loss)
+            
 
 
-            for idx, context_length in enumerate(contexts):
-                mse_results[context_length].append(mse_per_context[idx])
-                mse_control_results[context_length].append(mse_control_per_context[idx])
+            # for idx, context_length in enumerate(contexts):
+            #     mse_results[context_length].append(mse_per_context[idx])
+            #     mse_control_results[context_length].append(mse_control_per_context[idx])
         
             counter += 1
             
-        mse_mean = {context_length: np.mean(mse_results[context_length]) for context_length in contexts}
-        mse_std = {context_length: np.std(mse_results[context_length]) for context_length in contexts}
-        mse_control_mean = {context_length: np.mean(mse_control_results[context_length]) for context_length in contexts}
-        mse_control_std = {context_length: np.std(mse_control_results[context_length]) for context_length in contexts}
+        # mse_mean = {context_length: np.mean(mse_results[context_length]) for context_length in contexts}
+        # mse_std = {context_length: np.std(mse_results[context_length]) for context_length in contexts}
+        # mse_control_mean = {context_length: np.mean(mse_control_results[context_length]) for context_length in contexts}
+        # mse_control_std = {context_length: np.std(mse_control_results[context_length]) for context_length in contexts}
         # print(f"Mean MSE: {mse_mean}")
         # print(f"Std MSE: {mse_std}")
 
-    plot_mse_vs_context_length(mse_mean, mse_std, save_results_path, folder_name, mse_plot_label, loss_type="state")
-    plot_mse_vs_context_length(mse_control_mean, mse_control_std, save_results_path, folder_name, mse_plot_label, loss_type="control")
+    # plot_mse_vs_context_length(mse_mean, mse_std, save_results_path, folder_name, mse_plot_label, loss_type="state")
+    # plot_mse_vs_context_length(mse_control_mean, mse_control_std, save_results_path, folder_name, mse_plot_label, loss_type="control")
 
 
                 
@@ -912,18 +927,40 @@ try:
     #                               165000, 250000, 255000, 260000, 275000, 284408]
 
     # model_checkpoint_step_list = [395000]
-    model_checkpoint_step_list = [135000]
+    # model_checkpoint_step_list = [50000, 135000, 300000]
+    # model_checkpoint_step_list = [10000, 20000, 30000, 60000, 100000]
+    model_checkpoint_step_list = [300000] #[50000] #, 60000, 10000, 20000, 30000, 100000, 135000, 200000, 300000]
+    Num_of_contexts = [1, 5, 10, 25, 50, 75, 100]
 
     for step in tqdm(model_checkpoint_step_list, desc="Model Checkpoint Steps"):
         model_checkpoint_step = int(step)
         folder_name = f"inference_run/{plot_label}_{model_checkpoint_step}_{model_run_id}"
-        results = main(model_checkpoint_step, folder_name)
+        # results = main(model_checkpoint_step, folder_name)
 
-    
-        save_results = os.path.join(folder_name, f"results_maxcontext{Num_of_context}_numpends{Num_of_pendulums}_{mode}_alexcode.pkl")
+        phase_data = {context_length: [] for context_length in Num_of_contexts}
+        controls_data = {context_length: [] for context_length in Num_of_contexts}
+        data_and_controls = []
 
-        with open(save_results, "wb") as f:
-            pickle.dump(results, f)
+        for Num_of_context in Num_of_contexts:
+            print(f"Running inference for checkpoint step {model_checkpoint_step} with context length {Num_of_context}...")
+
+            results = main(model_checkpoint_step,
+                            folder_name,
+                            Num_of_context,
+                            # mse_results,
+                            # mse_control_results,
+                            phase_data,
+                            controls_data,
+                            data_and_controls,                          
+                           ) 
+            _, _, _, _, phase_data, controls_data, data_and_controls, pends = results
+        
+        
+            save_results = os.path.join(folder_name, f"results_maxcontext{Num_of_context}_numpends{Num_of_pendulums}_{mode}_alexcode.pkl")    
+            # save_results = os.path.join(folder_name, f"results_maxcontext{Num_of_context}_numpends{Num_of_pendulums}_{mode}_alexcode.pkl")
+
+            with open(save_results, "wb") as f:
+                pickle.dump(results, f)
     
 
 

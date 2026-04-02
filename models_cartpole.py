@@ -281,8 +281,8 @@ class TransformerModel(nn.Module):
             # stacked_inputs = torch.stack((states_embed, controls_embed), dim=2)
             # zs = stacked_inputs.view(xs_b.shape[0], 2 * xs_b.shape[1], -1)
             stacked_inputs = torch.stack((states_embed, distance_embed, switch_embed, controls_embed), dim=2)
-            zs = stacked_inputs.view(xs_b.shape[0], 4 * xs_b.shape[1], -1)
-            
+            zs = stacked_inputs.view(xs_b.shape[0], 4 * xs_b.shape[1], -1) # (s1, d1, a1, m1, s2, d2, a2, m2, ..., st, dt, at, mt)
+
             # 2/21/2026: adding Rotary Positional Embeddings (RoPE) for better generalization to longer sequences
             if self.cos_cached is None or self.cos_cached.shape[0] < zs.shape[1] or self.cos_cached.device != zs.device:
                 cos, sin = self.get_cos_sin_embeddings(zs.shape[1], zs.shape[2], zs.device)
@@ -765,6 +765,8 @@ class RNNModel(nn.Module):
     - v2 : No ReLU, pred st+1 directly from ht ; predicts (st+1, at, mt) with (st, at, mt)
     - v3 : v2 ; predicts (st+1, at, mt) with (st, at-1, mt-1)
     - | Knowing where we are at and what got us there should be enough to capture dynamics.
+    - v4 : pass in (s1, m1, a1, s2, m2, a2, ..., st, mt, at) and use hidden states corresponding to sk to predict sk+1, ak, mk
+    - | This is analogous to using the transformer embedding for sk to predict sk+1, ak, mk
     """
     def __init__(self, n_dims : dict, hidden_size : int, num_layers : int, cell_type : str, n_embd=256):
         super(RNNModel, self).__init__()
@@ -778,19 +780,19 @@ class RNNModel(nn.Module):
         self.a_embd = nn.Linear(n_dims['control'], n_embd)
 
         if cell_type == 'rnn':
-            self.rnn = nn.RNN(input_size=4*n_embd, 
+            self.rnn = nn.RNN(input_size=n_embd, 
                             hidden_size=hidden_size,
                             num_layers=num_layers,
                             batch_first=True,
                             dropout=0.2)
         elif cell_type == 'gru':
-            self.rnn = nn.GRU(input_size=4*n_embd, 
+            self.rnn = nn.GRU(input_size=n_embd, 
                             hidden_size=hidden_size,
                             num_layers=num_layers,
                             batch_first=True,
                             dropout=0.2)
         elif cell_type == 'lstm':
-            self.rnn = nn.LSTM(input_size=4*n_embd, 
+            self.rnn = nn.LSTM(input_size=n_embd, 
                             hidden_size=hidden_size,
                             num_layers=num_layers,
                             batch_first=True,
@@ -803,7 +805,7 @@ class RNNModel(nn.Module):
         self.head_m = nn.Linear(hidden_size, n_dims['mode'])
         self.head_a = nn.Linear(hidden_size, n_dims['control'])
 
-        self.input_ln = nn.LayerNorm(4*n_embd)
+        self.input_ln = nn.LayerNorm(n_embd)
 
         # Runs on CPU, ~minutes of overhead
         for name, param in self.rnn.named_parameters():
@@ -813,13 +815,13 @@ class RNNModel(nn.Module):
     def forward(self, s, m, a, inf=False):
         """
         Inputs:
-            - s : s_{1:t} sequence of states (batch_size, seq_length, 4)          
-            - m : m_{0:t-1} sequence of modes (batch_size, seq_length, 1)         
-            - a : a_{0:t-1} sequence of control inputs (batch_size, seq_length, 1)   
+            - s : s_{1:t} sequence of states (batch_size, seq_length, 5)          
+            - m : m_{1:t} sequence of modes (batch_size, seq_length, 1)         
+            - a : a_{1:t} sequence of control inputs (batch_size, seq_length, 1)   
             - inf : inference mode (T/F)
 
         Outputs:
-            - s_pred : ^s_{2:t+1} predicted sequence of states (batch_size, seq_length, 4)
+            - s_pred : ^s_{2:t+1} predicted sequence of states (batch_size, seq_length, 5)
             - m_logits : ^m_{1:t} sequence of mode logits (batch_size, seq_length, 1)
             - a_pred : ^a_{1:t} predicted sequence of control inputs (batch_size, seq_length, 1)
         """
@@ -836,19 +838,26 @@ class RNNModel(nn.Module):
         e_m = self.m_embd(m.long().squeeze(-1))
         e_a = self.a_embd(a)
 
-        x = torch.cat((e_s, e_d, e_m, e_a), dim=-1)
+        # x = torch.cat((e_s, e_d, e_m, e_a), dim=-1)
+        # --- 3/31/26 1pm : We want (s1, d1, m1, a1, s2, d2, m2, a2, ..., st, dt, mt, at) now.
+
+        x = torch.stack((e_s, e_d, e_m, e_a), dim=2) # x : (B, L, 4, D)
+        x = x.reshape(s.shape[0], 4 * s.shape[1], -1) # x : (B, 4L, D)
         x = self.input_ln(x)
 
         # Uses teacher-forcing by default.
-        out, _ = self.rnn(x)
+        out, _ = self.rnn(x) # out : (B, 4L, hidden_size)
+
+        # Only get hidden states associated with states
+        out = out[:, ::4, :] # out : (B, L, hidden_size)
 
         if inf:
-            out = out[:, -1:, :] # take the last output in predicted sequence
+            out = out[:, -1, :] # Take h_t' associated with s_t
 
         m_logits = self.head_m(out)
-        a_pred = self.head_a(out)
+        a_pred = self.head_a(out) 
         # --- 3/27/26 12pm : Error accumulation? Could revisit.
         # s_pred = self.head_s(torch.cat((out, a_pred), dim=-1))
-        s_pred = self.head_s(out)
+        s_pred = self.head_s(out) 
 
         return s_pred, m_logits, a_pred

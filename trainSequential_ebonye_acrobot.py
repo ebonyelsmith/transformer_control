@@ -104,8 +104,13 @@ def train_step(model, xs, ys, optimizer, loss_func, i, args, numtrainingsteps, b
 
 
     # output_controls, output_states = model(xs_scaled, ys_scaled)
-    output_controls, output_states, switch_logits = model(xs_scaled, ys_scaled)
+    # output_controls, output_states, switch_logits = model(xs_scaled, ys_scaled)
 
+    zero_dyn_mask = (ys_scaled[..., 1] == -1.0).unsqueeze(-1)  # Assuming the second column indicates zero dynamics
+
+    ys_scaled_for_model = ys_scaled.clone()
+    ys_scaled_for_model[..., 1] = ys_scaled_for_model[..., 1] + 1
+    output_controls, output_states, switch_logits = model(xs_scaled, ys_scaled_for_model)
     
 
 
@@ -121,9 +126,13 @@ def train_step(model, xs, ys, optimizer, loss_func, i, args, numtrainingsteps, b
     # loss_controls = loss_func(output_controls.squeeze(-1)[:,:-1], ys_scaled[..., 0])
     # import pdb; pdb.set_trace()
     ys_scaled = ys_scaled.to(output_controls.device)
-    loss_controls = loss_func(output_controls.squeeze(-1)[:,:-1], ys_scaled[:, :-1, 0])
+    # loss_controls = loss_func(output_controls.squeeze(-1)[:,:-1], ys_scaled[:, :-1, 0])
     # loss_controls = (output_controls.squeeze(-1)[:,:-1] - ys_scaled[..., 0]).pow(2)
-    
+    # raw_mse = (output_controls.squeeze(-1)[:,:-1] - ys_scaled[..., 0]).pow(2)
+    raw_mse = (output_controls.squeeze(-1)[:,:-1] - ys_scaled[:, :-1, 0]).pow(2)
+    active_mask = (~zero_dyn_mask[:,:-1].squeeze(-1)).float().to(raw_mse.device)  # Mask for active dynamics
+    loss_controls = (raw_mse * active_mask).sum() / (active_mask.sum() + 1e-8)  # Average only over active dynamics
+
 
 
     
@@ -143,16 +152,19 @@ def train_step(model, xs, ys, optimizer, loss_func, i, args, numtrainingsteps, b
     # import pdb; pdb.set_trace()
 
     # loss_switch = F.cross_entropy(switch_logits[:,:-1,:].reshape(-1, 2), ys_scaled[...,1].long().reshape(-1))  # Assuming ys_scaled[...,1] contains the switch labels
-    bce_loss = nn.BCEWithLogitsLoss()
-    switch_logits_flat = switch_logits[:, :-1].squeeze(-1).reshape(-1)  # Flatten the logits
-    # labels_flat = ys_scaled[..., 1].view(-1).float()  # Flatten the labels
-    labels_flat = ys_scaled[:, :-1, 1].reshape(-1).float()  # Flatten the labels
+    # bce_loss = nn.BCEWithLogitsLoss()
+    # switch_logits_flat = switch_logits[:, :-1].squeeze(-1).reshape(-1)  # Flatten the logits
+    # # labels_flat = ys_scaled[..., 1].view(-1).float()  # Flatten the labels
+    # labels_flat = ys_scaled[:, :-1, 1].reshape(-1).float()  # Flatten the labels
 
     # import pdb; pdb.set_trace()
 
-    loss_switch = bce_loss(switch_logits_flat, labels_flat)
+    # loss_switch = bce_loss(switch_logits_flat, labels_flat)
+    target_modes = (ys_scaled[:,:-1, 1] + 1).long()
+    mode_logits_flat = switch_logits[:, :-1, :].reshape(-1, 3)
+    target_modes_flat = target_modes.reshape(-1)
 
-
+    loss_switch = nn.CrossEntropyLoss()(mode_logits_flat, target_modes_flat)
     # loss = loss_controls + loss_states
     alpha_controls = 1.0
     alpha_states = 5.0
@@ -622,10 +634,14 @@ def train(model, args):
                 # sampler = DistributedSampler(dataset_full, shuffle=True)
                 # dataloader = DataLoader(dataset_full, batch_size=batch_size, sampler=sampler, num_workers=2, pin_memory=True)   
 
-                segmented_dataset = SegmentedAcrobotDataset(dataset_full, window_size=120)
-                sampler = DistributedSampler(segmented_dataset, shuffle=True)
-                dataloader = DataLoader(segmented_dataset, batch_size=batch_size, sampler=sampler, num_workers=2)
+                # segmented_dataset = SegmentedAcrobotDataset(dataset_full, window_size=120)
+                # sampler = DistributedSampler(segmented_dataset, shuffle=True)
+                # dataloader = DataLoader(segmented_dataset, batch_size=batch_size, sampler=sampler, num_workers=2)
                 
+                # create dataloader
+                sampler = DistributedSampler(dataset_full, shuffle=True)
+                dataloader = DataLoader(dataset_full, batch_size=batch_size, sampler=sampler, num_workers=2, pin_memory=True)
+
                 # import pdb; pdb.set_trace()
 
                 # with tqdm(total=len(dataset), desc=f"Training Chunk {chunk_idx + 1}/{num_chunks}") as pbar:
@@ -862,8 +878,8 @@ if __name__ == "__main__":
         model_dest_path = os.path.join(args.out_dir, "models_acrobot_new.py")
         shutil.copy(model_source_path, model_dest_path)
 
-        train_source_path = "trainSequential_ebonye_acrobot.py"
-        train_dest_path = os.path.join(args.out_dir, "trainSequential_ebonye_acrobot.py")
+        train_source_path = "trainSequential_ebonye_acrobot_zerodyn.py"
+        train_dest_path = os.path.join(args.out_dir, "trainSequential_ebonye_acrobot_zerodyn.py")
         shutil.copy(train_source_path, train_dest_path)
         
 

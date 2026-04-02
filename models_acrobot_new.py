@@ -740,3 +740,107 @@ class XGBoostModel:
             preds.append(pred)
 
         return torch.stack(preds, dim=1)
+
+class RNNModel(nn.Module):
+    """
+    RNN with prediction heads for state, mode, and control input.
+    - v1 : ReLU on embeddings, pred st+1 with at+1 ; predicts (st+1, at, mt) with (st, at, mt)
+    - v2 : No ReLU, pred st+1 directly from ht ; predicts (st+1, at, mt) with (st, at, mt)
+    - v3 : v2 ; predicts (st+1, at, mt) with (st, at-1, mt-1)
+    - | Knowing where we are at and what got us there should be enough to capture dynamics.
+    - v4 : pass in (s1, m1, a1, s2, m2, a2, ..., st, mt, at) and use hidden states corresponding to sk to predict sk+1, ak, mk
+    - | This is analogous to using the transformer embedding for sk to predict sk+1, ak, mk
+    """
+    def __init__(self, n_dims : dict, hidden_size : int, num_layers : int, cell_type : str, n_embd=256):
+        super(RNNModel, self).__init__()
+        assert cell_type in ['rnn', 'lstm', 'gru']
+        self.n_dims = n_dims
+
+        # Gemini Recommendation: embed covariates to avoid type inconsistency
+        self.s_embd = nn.Linear(n_dims['state'], n_embd)
+        self.d_embd = nn.Linear(n_dims['distance'], n_embd)
+        self.m_embd = nn.Embedding(n_dims['mode'], n_embd)
+        self.a_embd = nn.Linear(n_dims['control'], n_embd)
+
+        if cell_type == 'rnn':
+            self.rnn = nn.RNN(input_size=n_embd, 
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            batch_first=True,
+                            dropout=0.2)
+        elif cell_type == 'gru':
+            self.rnn = nn.GRU(input_size=n_embd, 
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            batch_first=True,
+                            dropout=0.2)
+        elif cell_type == 'lstm':
+            self.rnn = nn.LSTM(input_size=n_embd, 
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            batch_first=True,
+                            dropout=0.2)
+
+        # --- 3/27/26 12pm: See changes below to state prediction
+        # self.head_s = nn.Linear(hidden_size + n_dims['control'], n_dims['state'])
+        
+        self.head_s = nn.Linear(hidden_size, n_dims['state'])
+        self.head_m = nn.Linear(hidden_size, n_dims['mode'])
+        self.head_a = nn.Linear(hidden_size, n_dims['control'])
+
+        self.input_ln = nn.LayerNorm(n_embd)
+
+        # Runs on CPU, ~minutes of overhead
+        for name, param in self.rnn.named_parameters():
+            if 'weight' in name:
+                nn.init.orthogonal_(param)
+
+    def forward(self, s, m, a, inf=False):
+        """
+        Inputs:
+            - s : s_{1:t} sequence of states (batch_size, seq_length, 6)          
+            - m : m_{1:t} sequence of modes (batch_size, seq_length, 1)         
+            - a : a_{1:t} sequence of control inputs (batch_size, seq_length, 1)   
+            - inf : inference mode (T/F)
+
+        Outputs:
+            - s_pred : ^s_{2:t+1} predicted sequence of states (batch_size, seq_length, 6)
+            - m_logits : ^m_{1:t} sequence of mode logits (batch_size, seq_length, 1)
+            - a_pred : ^a_{1:t} predicted sequence of control inputs (batch_size, seq_length, 1)
+        """
+        goal_state = torch.tensor([-1.0, 0.0, 1.0, 0.0, 0.0, 0.0], device=s.device) 
+        d = torch.norm(s - goal_state, dim=-1, keepdim=True)
+
+        # e_s = torch.relu(self.s_embd(s))
+        # e_d = torch.relu(self.d_embd(d))
+        # e_m = self.m_embd(m.long()).squeeze(2)
+        # e_a = torch.relu(self.a_embd(a))
+        # --- 3/27/26 12pm : NO RELU! Data normalized around origin, crushing half 
+        e_s = self.s_embd(s)
+        e_d = self.d_embd(d)
+        e_m = self.m_embd(m.long().squeeze(-1))
+        e_a = self.a_embd(a)
+
+        # x = torch.cat((e_s, e_d, e_m, e_a), dim=-1)
+        # --- 3/31/26 1pm : We want (s1, d1, m1, a1, s2, d2, m2, a2, ..., st, dt, mt, at) now.
+
+        x = torch.stack((e_s, e_d, e_m, e_a), dim=2) # x : (B, L, 4, D)
+        x = x.reshape(s.shape[0], 4 * s.shape[1], -1) # x : (B, 4L, D)
+        x = self.input_ln(x)
+
+        # Uses teacher-forcing by default.
+        out, _ = self.rnn(x) # out : (B, 4L, hidden_size)
+
+        # Only get hidden states associated with states
+        out = out[:, ::4, :] # out : (B, L, hidden_size)
+
+        if inf:
+            out = out[:, -1, :] # Take h_t' associated with s_t
+
+        m_logits = self.head_m(out)
+        a_pred = self.head_a(out) 
+        # --- 3/27/26 12pm : Error accumulation? Could revisit.
+        # s_pred = self.head_s(torch.cat((out, a_pred), dim=-1))
+        s_pred = self.head_s(out) 
+
+        return s_pred, m_logits, a_pred

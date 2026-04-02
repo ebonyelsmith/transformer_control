@@ -143,7 +143,7 @@ def run_single_system(masscart, masspole, length, state_data, ctrl_data, run_idx
     plt.figure(figsize=(15, 10))
     for i in range(4):
         plt.subplot(3, 2, i+1)
-        plt.scatter(range(len(states)), states[:, i], label='Transformer ' + labels[i], color=colors[i], s=10)
+        plt.scatter(range(len(states)), states[:, i], label='LSTM ' + labels[i], color=colors[i], s=10)
         if true_state_data is not None and true_ctrl_data is not None:
             plt.scatter(range(len(true_states)), true_states[:, i], label='Reference ' + labels[i], color='cyan', s=10, alpha=0.5)
         # plt.title(labels[i] + ' Over Time') if true_state_data is None else plt.title(f'Transformer vs Reference {labels[i]} Over Time (Context: {context})')
@@ -158,7 +158,7 @@ def run_single_system(masscart, masspole, length, state_data, ctrl_data, run_idx
         plt.legend(fontsize=16)
 
     plt.subplot(3, 2, 5)
-    plt.scatter(range(len(actions)), actions[:,0], label='Transformer Control Actions', color='red', s=10)
+    plt.scatter(range(len(actions)), actions[:,0], label='LSTM Control Actions', color='red', s=10)
     if true_state_data is not None and true_ctrl_data is not None:
         plt.scatter(range(len(true_actions)), true_actions[:,0], label='Reference Control Actions', color='cyan', s=10)
     # plt.title('Control Actions Over Time') if true_ctrl_data is None else plt.title(f'Predicted vs Reference Control Actions Over Time (Context: {context})')
@@ -172,7 +172,7 @@ def run_single_system(masscart, masspole, length, state_data, ctrl_data, run_idx
     # plt.legend()
     plt.legend(fontsize=16)
     plt.subplot(3, 2, 6)
-    plt.scatter(range(len(actions)), actions[:,1] + 1.0, label='Transformer Control Labels', color='red', s=10)
+    plt.scatter(range(len(actions)), actions[:,1] + 1.0, label='LSTM Control Labels', color='red', s=10)
     if true_state_data is not None and true_ctrl_data is not None:
         updated_true_actions = true_actions[:,1] + 1.0  # Shift true control labels up by 1.0 for better visualization
         plt.scatter(range(len(true_actions)), updated_true_actions, label='Reference Control Labels', color='cyan', s=10, alpha=0.5)
@@ -213,10 +213,10 @@ if __name__ == "__main__":
     results = []
     save_dir = os.path.join(os.getcwd(), 'videos', 'cartpole_inference_gym_runs')
     # os.makedirs(save_dir, exist_ok=True)
-    model_run_id = "three_layer_lstm_v3_h1024_e256_dropout_retrain"#"5a28bfa8-c81f-473b-996f-879dfadc62df"#"3f8379cf-1cf0-47db-9210-5abb1c43e5fb" #"b3725997-9aee-4578-b668-d33e7cb29c4e" #"2ca9672c-582e-43ef-85cf-8550f325947a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"cf756e46-3ddb-4df7-9a13-ba850f495257" #"5b73d6c9-b526-4bfe-bab3-005f5369cf5a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"f8211c69-7ae8-47b3-9bd2-e4f0edda1e82"#"de00c432-078f-44d1-8cc9-e6ab0dfdca88" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"c3af70ca-3733-4cec-a876-95db9bc9a593" #"32ea0675-5539-4d02-80fb-7bfe1f4c263e" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"57f687d9-9e41-48f5-83d4-559592ca762b" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"be268b82-d25e-4026-b303-91ba3c6d1e9f" #"eb14c6a6-d8eb-4b1c-8f37-a57c04a2d66b" #"a49e6137-5856-47ca-86d8-1d37f2f11e7b" #"a885c11b-dee1-472b-9577-46c8c03f70b3" #"9329819d-2d02-4ff0-8741-ed2959c98fdd" #"850d5e45-7a37-4e6d-8499-ac7b11076de3" #"0215ad56-8bf1-47e0-b509-db5af831dabe" #"ee0f5a22-9607-43e5-8cd9-db2f1be66a23"
+    model_run_id = "three_layer_lstm_v4_h1024_e256_dropout0.2"#"5a28bfa8-c81f-473b-996f-879dfadc62df"#"3f8379cf-1cf0-47db-9210-5abb1c43e5fb" #"b3725997-9aee-4578-b668-d33e7cb29c4e" #"2ca9672c-582e-43ef-85cf-8550f325947a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"cf756e46-3ddb-4df7-9a13-ba850f495257" #"5b73d6c9-b526-4bfe-bab3-005f5369cf5a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"f8211c69-7ae8-47b3-9bd2-e4f0edda1e82"#"de00c432-078f-44d1-8cc9-e6ab0dfdca88" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"c3af70ca-3733-4cec-a876-95db9bc9a593" #"32ea0675-5539-4d02-80fb-7bfe1f4c263e" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"57f687d9-9e41-48f5-83d4-559592ca762b" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"be268b82-d25e-4026-b303-91ba3c6d1e9f" #"eb14c6a6-d8eb-4b1c-8f37-a57c04a2d66b" #"a49e6137-5856-47ca-86d8-1d37f2f11e7b" #"a885c11b-dee1-472b-9577-46c8c03f70b3" #"9329819d-2d02-4ff0-8741-ed2959c98fdd" #"850d5e45-7a37-4e6d-8499-ac7b11076de3" #"0215ad56-8bf1-47e0-b509-db5af831dabe" #"ee0f5a22-9607-43e5-8cd9-db2f1be66a23"
     save_dir = os.path.join(save_dir, model_run_id)
     # os.makedirs(save_dir, exist_ok=True)
-    step = 17000 #30000 #55000#274941 #300800
+    step = 225547 #30000 #55000#274941 #300800
     save_dir = os.path.join(save_dir, f"step_{step}")
     os.makedirs(save_dir, exist_ok=True)
     numberpend = 100 #3 #11 #10 #200 #5
