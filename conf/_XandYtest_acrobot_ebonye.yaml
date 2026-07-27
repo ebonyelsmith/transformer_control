@@ -42,7 +42,7 @@ wandb:
 
 
 # dataset_filesfolder: "./dataset_pendulum" #Folder that stores all your pickle files and logging info
-dataset_filesfolder: "/data/esmith/Dataset_Acrobot_AIGymWithNoiseShorter_ICL" #Folder that stores all your pickle files and logging info
+dataset_filesfolder: "/data/esmith/Dataset_Acrobot_AIGymWithNoiseShorter_ICL_nozerodyn" #Folder that stores all your pickle files and logging info
 pickle_folder: "picklefolder"  # Subfolder of dataset_filesfolder that will have all your trainingpkl files
 pickle_folder_test: "picklefolder_test_indistr"  # Subfolder of dataset_filesfolder that will have all your test pkl files
 pickle_folder_test_outofdistr: "picklefolder_test_outofdistr"  # Subfolder of dataset_filesfolder that will have all your test pkl files

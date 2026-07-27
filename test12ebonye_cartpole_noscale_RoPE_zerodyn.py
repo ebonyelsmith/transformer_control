@@ -20,18 +20,18 @@ import re
 
 
 
-plot_label = 'mse_control'
+plot_label = 'nozerodyntrain_zerodyninf'
 phase_plot_label = 'mse_control_phaseplot'
 mse_plot_label = 'mse_control_mseplot'
 save_results = "trainsteps_test_mse_control.txt"
 save_phase_plot = "trainsteps_test_mse_control.txt"
 log_info = "trainsteps_log_mse_control.txt"
 model_name= "cartpole_cos_sin_theta" #"cartpole_cos_sin_theta" #"cartpole" #"test"
-model_run_id= "fc5cb0fe-d4c6-4fba-8196-01a37d611194" #"5a28bfa8-c81f-473b-996f-879dfadc62df" #"3f8379cf-1cf0-47db-9210-5abb1c43e5fb" #"b3725997-9aee-4578-b668-d33e7cb29c4e" #"2ca9672c-582e-43ef-85cf-8550f325947a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"cf756e46-3ddb-4df7-9a13-ba850f495257" #"5b73d6c9-b526-4bfe-bab3-005f5369cf5a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"c7978c77-a2d6-4d87-a256-d42690204829" #"f8211c69-7ae8-47b3-9bd2-e4f0edda1e82" #"de00c432-078f-44d1-8cc9-e6ab0dfdca88" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"c3af70ca-3733-4cec-a876-95db9bc9a593" #"32ea0675-5539-4d02-80fb-7bfe1f4c263e" #"57f687d9-9e41-48f5-83d4-559592ca762b" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"be268b82-d25e-4026-b303-91ba3c6d1e9f" 
+model_run_id= "5a28bfa8-c81f-473b-996f-879dfadc62df" #"42ce9ab0-9db7-41c1-b944-59424adef6a7" #"fc5cb0fe-d4c6-4fba-8196-01a37d611194" #"5a28bfa8-c81f-473b-996f-879dfadc62df" #"3f8379cf-1cf0-47db-9210-5abb1c43e5fb" #"b3725997-9aee-4578-b668-d33e7cb29c4e" #"2ca9672c-582e-43ef-85cf-8550f325947a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"cf756e46-3ddb-4df7-9a13-ba850f495257" #"5b73d6c9-b526-4bfe-bab3-005f5369cf5a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"c7978c77-a2d6-4d87-a256-d42690204829" #"f8211c69-7ae8-47b3-9bd2-e4f0edda1e82" #"de00c432-078f-44d1-8cc9-e6ab0dfdca88" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"c3af70ca-3733-4cec-a876-95db9bc9a593" #"32ea0675-5539-4d02-80fb-7bfe1f4c263e" #"57f687d9-9e41-48f5-83d4-559592ca762b" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"be268b82-d25e-4026-b303-91ba3c6d1e9f" 
 # model_checkpoint_step= 40000 #30000 #55000 #274941 #195000 #5000 #15000 #274941 #115000 #300800 #204800 #102400
 model_checkpoint_epoch = 1 #25 #59 #125 #14 #38 #60 #125
 # folder_name = f"inference_run/{plot_label}_{model_checkpoint_step}_{model_run_id}"
-mode = 'ood' # 'train', 'ood', 'indistr'
+mode = 'ood_hard' # 'train', 'ood', 'indistr'
 
     
 
@@ -332,11 +332,9 @@ def run_inference_on_model(model, XData, YS, total_time, device, dt=0.01, contex
             # import pdb; pdb.set_trace()
             # print(f"xs shape: {xs.shape}, ys shape: {ys.shape}")
             # u_pred, state_pred = model(xs, ys, inf = "yes") # 7/18/2025
-            # debugging
-            # print(f"ys_for_model shape: {ys_for_model.shape}") #7/18/2025
-            # print(f"control in ys_for_model: {ys_for_model[:, 0]}") #7/18/2025
-            # print(f"switch labels in ys_for_model: {ys_for_model[:, 1]}") #7/18/2025
-            u_pred, state_pred, flag_pred = model(xs, ys_for_model, inf = "yes") # 7/18/2025
+            
+            u_pred, state_pred, flag_pred = model(xs, ys_for_model, inf = "yes") # 7/18/2025 #4/19/2026 no state head ablation
+            # u_pred, flag_pred = model(xs, ys_for_model, inf = "yes") # 4/19/2026 no state head ablation
             # u_pred, state_pred = model(XData_context[start_index - context:], YS_context[start_index - context:], inf = "yes")
             # u_pred = model(XData_context_scaled, YS_context_scaled, inf = "yes")
             # u = u_pred[0][-2].cpu().numpy()
@@ -653,12 +651,22 @@ def main(
     # X0s = []
     # data_and_controls = []
     
-    if mode == 'ood':
+    if mode == 'ood_easy':
         # base_dir = f"/data/esmith/Dataset_LinearSystem_ICL/picklefolder_test_outofdistr"
         # base_dir = f"/data/esmith/Dataset_Cartpole_ICL/picklefolder_test_outofdistr"
         # base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL/picklefolder_test_outofdistr"
         # base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges/picklefolder_test_outofdistr"
         base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges_zero_dyn/picklefolder_test_outofdistr"
+        # base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges_zero_dyn_harderOOD/picklefolder_test_outofdistr"
+        # pickle_file = "batch_test_0.pkl"
+        pickle_file = f"batch_test_0_{number_of_context}.pkl"
+    elif mode == 'ood_hard':
+        # base_dir = f"/data/esmith/Dataset_LinearSystem_ICL/picklefolder_test_outofdistr_hard"
+        # base_dir = f"/data/esmith/Dataset_Cartpole_ICL/picklefolder_test_outofdistr_hard"
+        # base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL/picklefolder_test_outofdistr_hard"
+        # base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges/picklefolder_test_outofdistr_hard"
+        # base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges_zero_dyn/picklefolder_test_outofdistr"
+        base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges_zero_dyn_harderOOD/picklefolder_test_outofdistr"
         # pickle_file = "batch_test_0.pkl"
         pickle_file = f"batch_test_0_{number_of_context}.pkl"
     elif mode == 'indistr':
@@ -866,7 +874,8 @@ try:
     # model_checkpoint_step_list = [16000, 20000, 30000, 40000, 43734]
     # model_checkpoint_step_list = [10000, 50000] #[17000]
     # model_checkpoint_step_list = [200, 400, 2000, 5000, 10000, 17000, 30000, 60000, 100000, 200000]
-    model_checkpoint_step_list = [5000, 10000, 17000, 30000, 60000, 100000, 200000]
+    # model_checkpoint_step_list = [5000, 10000, 17000, 30000, 60000, 100000, 200000]
+    model_checkpoint_step_list = [5000, 10000, 17000]
     Num_of_contexts = [1, 5, 10, 25, 50]
     # Num_of_contexts = [5]
 

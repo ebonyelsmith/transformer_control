@@ -17,7 +17,7 @@ training:
     learning_rate: 0.0001 #train
     save_every_steps: 200 #5000 #1000
     keep_every_steps: 200 #5000 #1000
-    train_steps: 6400 #500000 #32000000 #50000 #100000 #50000 #320000 #100000 #80000 #5000 #1000000
+    train_steps: 400 #6400 #500000 #32000000 #50000 #100000 #50000 #320000 #100000 #80000 #5000 #1000000
     test_pendulums: 1 #1 #batches of 5000
     test_pendulums_outofdistr: 1 #batches of 5000
     # resume_id: "0d9850b9-b35f-4e2c-a069-16727a95028f"
@@ -34,7 +34,7 @@ training:
             interval: 2000000000000
 
 wandb:
-    name: "new cartpole RoPE with lqr noise, added time embeddings, control, state, switch head, distance to goal embedding, cos_sin theta"
+    name: "new cartpole RoPE without lqr noise, added time embeddings, control, state, switch head, distance to goal embedding, cos_sin theta"
     entity: "ebonyesmith-uc-berkeley-electrical-engineering-computer-" #"afrias5"
     project: "test"
 

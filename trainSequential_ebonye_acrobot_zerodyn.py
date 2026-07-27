@@ -11,7 +11,8 @@ import tasks
 from curriculum import Curriculum
 from schema import schema
 # from models import build_model
-from models_acrobot_new import build_model
+# from models_acrobot_new import build_model #4/19/2026 no state head ablation
+from models_acrobot_new_nostatehead import build_model #4/19/2026 no state head ablation
 import wandb
 import pickle
 import random
@@ -110,12 +111,14 @@ def train_step(model, xs, ys, optimizer, loss_func, i, args, numtrainingsteps, b
 
     ys_scaled_for_model = ys_scaled.clone()
     ys_scaled_for_model[..., 1] = ys_scaled_for_model[..., 1] + 1
-    output_controls, output_states, switch_logits = model(xs_scaled, ys_scaled_for_model)
+    # output_controls, output_states, switch_logits = model(xs_scaled, ys_scaled_for_model) #4/19/2026 no state head ablation
+    output_controls, switch_logits = model(xs_scaled, ys_scaled_for_model) #4/19/2026 no state head ablation
     
 
 
     # output = [output_controls.detach(), output_states.detach()]
-    output = [output_controls.detach(), output_states.detach(), switch_logits.detach()]
+    # output = [output_controls.detach(), output_states.detach(), switch_logits.detach()] #4/19/2026 no state head ablation
+    output = [output_controls.detach(), switch_logits.detach()] #4/19/2026 no state head ablation
 
     # import pdb; pdb.set_trace()
 
@@ -136,28 +139,9 @@ def train_step(model, xs, ys, optimizer, loss_func, i, args, numtrainingsteps, b
 
 
     
-    xs_scaled = xs_scaled.to(output_states.device)
-    loss_states = loss_func(output_states[:,:-1], xs_scaled[:,1:])
-    # loss_states = (output_states[:,:-1] - xs_scaled[:,1:]).pow(2)
-
-    # lqr_weight = 100.0 #15.0
-    # weight_mask = 1.0 + (lqr_weight - 1.0) * (ys_scaled[..., 1])
-
-    # loss_controls = loss_controls * weight_mask
-    # loss_states = loss_states.mean(dim=-1) * weight_mask
-
-    # loss_controls = loss_controls.mean()  # Average over the batch
-    # loss_states = loss_states.mean()  # Average over the batch
-
-    # import pdb; pdb.set_trace()
-
-    # loss_switch = F.cross_entropy(switch_logits[:,:-1,:].reshape(-1, 2), ys_scaled[...,1].long().reshape(-1))  # Assuming ys_scaled[...,1] contains the switch labels
-    # bce_loss = nn.BCEWithLogitsLoss()
-    # switch_logits_flat = switch_logits[:, :-1].squeeze(-1).reshape(-1)  # Flatten the logits
-    # # labels_flat = ys_scaled[..., 1].view(-1).float()  # Flatten the labels
-    # labels_flat = ys_scaled[:, :-1, 1].reshape(-1).float()  # Flatten the labels
-
-    # import pdb; pdb.set_trace()
+    # xs_scaled = xs_scaled.to(output_states.device) #4/19/2026 no state head ablation
+    # loss_states = loss_func(output_states[:,:-1], xs_scaled[:,1:]) #4/19/2026 no state head ablation
+    
 
     # loss_switch = bce_loss(switch_logits_flat, labels_flat)
     target_modes = (ys_scaled[:,:-1, 1] + 1).long()
@@ -170,7 +154,8 @@ def train_step(model, xs, ys, optimizer, loss_func, i, args, numtrainingsteps, b
     alpha_states = 5.0
     alpha_switch = 1.0
     # loss = loss_controls + loss_states + loss_switch
-    loss = alpha_controls * loss_controls + alpha_states * loss_states + alpha_switch * loss_switch
+    # loss = alpha_controls * loss_controls + alpha_states * loss_states + alpha_switch * loss_switch #4/19/2026 no state head ablation
+    loss = alpha_controls * loss_controls + alpha_switch * loss_switch #4/19/2026 no state head ablation
     
     # import pdb; pdb.set_trace()
 
@@ -874,8 +859,12 @@ if __name__ == "__main__":
         with open(os.path.join(args.out_dir, "config.yaml"), "w") as yaml_file:
             yaml.dump(args.__dict__, yaml_file, default_flow_style=False)
 
-        model_source_path = "models_acrobot_new.py"
-        model_dest_path = os.path.join(args.out_dir, "models_acrobot_new.py")
+        # model_source_path = "models_acrobot_new.py" #4/19/2026 no state head ablation
+        # model_dest_path = os.path.join(args.out_dir, "models_acrobot_new.py")
+        # shutil.copy(model_source_path, model_dest_path)
+
+        model_source_path = "models_acrobot_new_nostatehead.py" #4/19/2026 no state head
+        model_dest_path = os.path.join(args.out_dir, "models_acrobot_new_nostatehead.py")
         shutil.copy(model_source_path, model_dest_path)
 
         train_source_path = "trainSequential_ebonye_acrobot_zerodyn.py"

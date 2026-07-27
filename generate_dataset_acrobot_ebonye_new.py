@@ -136,6 +136,8 @@ def extract_window_curated(xs, ys, true_xs, window_size=120):
     idxes = []
     batch_idx_list = []
     new_true_xs_list = []
+    # print(f"HERE I AM")
+    # print(f"xs.shape = {xs.shape}, ys.shape = {ys.shape}, true_xs.shape = {true_xs.shape}")
 
     for i in range(xs.shape[0]):
         # 1. find the transition point
@@ -143,6 +145,8 @@ def extract_window_curated(xs, ys, true_xs, window_size=120):
         avg_rev = torch.cumsum(cos_theta1.flip(0), dim=0) / torch.arange(1, len(cos_theta1)+1, device=cos_theta1.device)
         avg_cumsum_rev = avg_rev.flip(0)
         indices = torch.where(avg_cumsum_rev < -0.96)[0]
+
+        # print(f"Trajectory {i}: len(indices) = {len(indices)}")
 
         # t_switch = indices[0].item() if len(indices) > 0 else total_len // 2
         # if t_switch == indices[0].item():
@@ -209,6 +213,9 @@ def prefilter_trajs(xs, ys, true_xs, min_control_sum=200):
     filtered_true_xs = []
     indices = []
     for i in range(xs.shape[0]):
+        # if i == 1:
+        #     print(f"Trajectory {i}: control inputs = {ys[i, -500:, 1]}")
+        #     print(f"Trajectory {i}: sum of control inputs = {torch.sum(ys[i, -500:, 1])}")
         if torch.sum(ys[i, -500:, 1]) > min_control_sum:
             filtered_xs.append(xs[i])
             filtered_ys.append(ys[i])
@@ -280,7 +287,7 @@ def make_train_data(args):
 
     """
     curriculum = Curriculum(args.training.curriculum)
-    starting_step = 6000
+    starting_step = 4677
     # starting_step = 0
     bsize = args.training.batch_size
     pbar = tqdm(range(starting_step, args.training.train_steps + args.training.test_pendulums + args.training.test_pendulums_outofdistr)) 
@@ -315,7 +322,8 @@ def make_train_data(args):
                                                                          LINK_MASS_1=LINK_MASS_1,
                                                                          LINK_MASS_2=LINK_MASS_2,
                                                                          dt=dt, #test_mode=False
-                                                                         test_mode={'on': False, 'context': 100}
+                                                                        #  test_mode={'on': False, 'context': 100}
+                                                                        test_mode={'on': False, 'context': 0}   # generate traces without zero dynamics
                                                                          ) 
 
             # T_cpu = T.cpu()
@@ -326,14 +334,14 @@ def make_train_data(args):
             pickle_file = f'batch_{i}.pkl'
             pickle_path = os.path.join(base_data_dir, pickle_file)
 
-            # ## prune sequences that do not stabilize
-            # xs_cpu, control_values_cpu, true_xs_cpu, indices = prefilter_trajs(xs_cpu, control_values_cpu, true_xs_cpu, min_control_sum=200)
-            # # T_cpu = T_cpu[indices]
-            # # import pdb; pdb.set_trace()
-            # LINK_LENGTH_1 = LINK_LENGTH_1[indices]
-            # LINK_LENGTH_2 = LINK_LENGTH_2[indices]
-            # LINK_MASS_1 = LINK_MASS_1[indices]
-            # LINK_MASS_2 = LINK_MASS_2[indices]
+            ## prune sequences that do not stabilize
+            xs_cpu, control_values_cpu, true_xs_cpu, indices = prefilter_trajs(xs_cpu, control_values_cpu, true_xs_cpu, min_control_sum=200)
+            # T_cpu = T_cpu[indices]
+            # import pdb; pdb.set_trace()
+            LINK_LENGTH_1 = LINK_LENGTH_1[indices]
+            LINK_LENGTH_2 = LINK_LENGTH_2[indices]
+            LINK_MASS_1 = LINK_MASS_1[indices]
+            LINK_MASS_2 = LINK_MASS_2[indices]
 
             ## extract windows around stabilization events
             # xs_cpu, control_values_cpu, batch_idxes, idxes = extract_window_fast(xs_cpu, control_values_cpu, window_size=800)

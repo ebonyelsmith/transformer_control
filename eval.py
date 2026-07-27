@@ -56,6 +56,7 @@ def get_model_from_run(run_path, epoch, step=-1, only_conf=False):
     # model = models.build_model(conf.model)
     build_model_func = load_function_from_runpath(
         # run_path, "models.py", "build_model"
+        # run_path, "models_cartpole_nostatehead.py", "build_model"  #4/19/2026 no state head ablation
         run_path, "models_cartpole.py", "build_model"  # for cartpole model
         # run_path, "models_acrobot.py", "build_model"
         # run_path, "models_acrobot_new.py", "build_model"  # for new acrobot model with more layers and heads
