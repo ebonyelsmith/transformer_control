@@ -40,7 +40,7 @@ mode = 'indistr' # 'train', 'ood', 'indistr'
 total_time = 70 #12 #11.2 #12 #16 #4 #5 #1.5
 dt = 0.02
 # Num_of_context = 50 #150
-Num_of_pendulums = 100 #6 #10 #200 #1 #10 #20 #40 #10
+Num_of_pendulums = 50 #100 #0 #6 #10 #200 #1 #10 #20 #40 #10
 # start_index_num = [Num_of_context]
 # num_pts = int(total_time/dt)
 
@@ -929,8 +929,8 @@ try:
     # model_checkpoint_step_list = [395000]
     # model_checkpoint_step_list = [50000, 135000, 300000]
     # model_checkpoint_step_list = [10000, 20000, 30000, 60000, 100000]
-    model_checkpoint_step_list = [300000] #[50000] #, 60000, 10000, 20000, 30000, 100000, 135000, 200000, 300000]
-    Num_of_contexts = [1, 5, 10, 25, 50, 75, 100]
+    model_checkpoint_step_list = [25000] #[300000] #[50000] #, 60000, 10000, 20000, 30000, 100000, 135000, 200000, 300000]
+    Num_of_contexts = [1, 5, 10, 25, 50] #, 75, 100]
 
     for step in tqdm(model_checkpoint_step_list, desc="Model Checkpoint Steps"):
         model_checkpoint_step = int(step)

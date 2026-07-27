@@ -270,8 +270,8 @@ def make_train_data(args):
 
     """
     curriculum = Curriculum(args.training.curriculum)
-    # starting_step = 0
-    starting_step = 5650
+    starting_step = 400
+    # starting_step = 5650
     bsize = args.training.batch_size
     pbar = tqdm(range(starting_step, args.training.train_steps + args.training.test_pendulums + args.training.test_pendulums_outofdistr)) 
     # pbar_test = tqdm(range(args.training.test_pendulums))
@@ -295,7 +295,7 @@ def make_train_data(args):
             # cartmass, polemass, polelength = get_valid_masses_and_lengths_uniform(size=bsize, cartmass=2, polemasslowerbound=0.3, polemassupperbound=1.0, polelengthlowerbound=1.0, polelengthupperbound=1.5) 
             cartmass, polemass, polelength = get_valid_masses_and_lengths_uniform(size=bsize, cartmasslowerbound=2, cartmassupperbound=3, polemasslowerbound=1.1, polemassupperbound=2.0, polelengthlowerbound=1.6, polelengthupperbound=2.1)
             sampler = CartPoleSampler2(n_dims=4)
-            T, xs, control_values = sampler.generate_xs_dataset(curriculum.n_points, bsize = bsize, cartmass=cartmass, polemass=polemass, polelength=polelength, test_mode={'on': False, 'context': 50}) 
+            T, xs, control_values = sampler.generate_xs_dataset(curriculum.n_points, bsize = bsize, cartmass=cartmass, polemass=polemass, polelength=polelength, test_mode={'on': True, 'context': 50}) # change to True so that traces do not have noise in LQR
             
             pickle_file = f'batch_{i}.pkl'
             pickle_path = os.path.join(base_data_dir, pickle_file)
@@ -335,7 +335,8 @@ def make_train_data(args):
             # cartmass, polemass, polelength = get_valid_masses_and_lengths_uniform(size=bsize, cartmass=2, polemasslowerbound=1.1, polemassupperbound=2.0, polelengthlowerbound=1.6, polelengthupperbound=2.1)
             
             # for context in contexts:
-            cartmass, polemass, polelength = get_valid_masses_and_lengths_uniform(size=bsize, cartmasslowerbound=1.5, cartmassupperbound=2.0, polemasslowerbound=0.3, polemassupperbound=0.8, polelengthlowerbound=1.0, polelengthupperbound=1.5) ## 3/5/2025 out of distribution data
+            # cartmass, polemass, polelength = get_valid_masses_and_lengths_uniform(size=bsize, cartmasslowerbound=1.5, cartmassupperbound=2.0, polemasslowerbound=0.3, polemassupperbound=0.8, polelengthlowerbound=1.0, polelengthupperbound=1.5) ## 3/5/2025 out of distribution data
+            cartmass, polemass, polelength = get_valid_masses_and_lengths_uniform(size=bsize, cartmasslowerbound=3.0, cartmassupperbound=3.5, polemasslowerbound=2.0, polemassupperbound=2.5, polelengthlowerbound=2.2, polelengthupperbound=2.7) ## 3/5/2025 out of distribution data
             sampler = CartPoleSampler2(n_dims=4)
             for context in contexts:
                 T, xs, control_values = sampler.generate_xs_dataset(curriculum.n_points, bsize=bsize, cartmass=cartmass, polemass=polemass, polelength=polelength, device="cuda:0", test_mode={'on': True, 'context': context})

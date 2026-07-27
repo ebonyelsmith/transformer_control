@@ -11,6 +11,9 @@ import matplotlib.pyplot as plt
 # from gym_continuous_cartpole import ContinuousCartPoleEnv
 # from gym_cartpole_swingup_lqr import swingup_lqr_controller
 from gym_continuous_acrobot import AcrobotEnv
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
 
 def wrap(x, m=-np.pi-0.002, M=np.pi-0.002):
     """Wraps ``x`` so m <= x <= M; but unlike ``bound()`` which
@@ -163,7 +166,13 @@ def run_single_system(link_length1, link_length2, link_mass1, link_mass2, state_
     # Save state plots
     plt.figure(figsize=(15, 8))
     # labels = ['Cart Position (x)', 'Cart Velocity (x_dot)', 'Pole Angle (theta)', 'Pole Angular Velocity (theta_dot)']
-    labels = ['Theta 1 (theta1)', 'Theta 2 (theta2)', 'Theta Dot 1 (dtheta1)', 'Theta Dot 2 (dtheta2)']
+    # labels = ['Theta 1 (theta1)', 'Theta 2 (theta2)', 'Theta Dot 1 (dtheta1)', 'Theta Dot 2 (dtheta2)']
+    labels = [
+        r'Theta 1 ($\theta_1$)', 
+        r'Theta 2 ($\theta_2$)', 
+        r'Theta Dot 1 ($\dot{\theta}_1$)', 
+        r'Theta Dot 2 ($\dot{\theta}_2$)'
+    ]
     # colors = ['red', 'green', 'orange', 'purple']
     colors = ['red', 'red', 'red', 'red']
     for i in range(4):
@@ -213,9 +222,9 @@ def run_single_system(link_length1, link_length2, link_mass1, link_mass2, state_
         #     wrapped_states = np.array([wrap_angle(s[i]) for s in states])
         #     plt.scatter(range(len(states)), wrapped_states, label='Transformer', color=colors[i], s=10)
         # else:
-        plt.scatter(range(len(states)), states[:, i], label='Transformer', color=colors[i], s=10)
+        plt.scatter(range(len(states[:2000])), states[:2000, i], label='Transformer', color=colors[i], s=10)
         if true_state_data is not None and true_ctrl_data is not None:
-            plt.scatter(range(len(true_states)), true_states[:, i], label='Reference', color='cyan', s=10, alpha=0.5)
+            plt.scatter(range(len(true_states[:2000])), true_states[:2000, i], label='Reference', color='cyan', s=10, alpha=0.5)
         # plt.title(labels[i] + ' Over Time') if true_state_data is None else plt.title(f'Model vs Reference {labels[i]} Over Time (Context: {context})')
         # plt.xlabel('Time Step')
         plt.xlabel('Time Step', fontsize=24)
@@ -228,9 +237,9 @@ def run_single_system(link_length1, link_length2, link_mass1, link_mass2, state_
         # plt.legend(fontsize=16)
 
     plt.subplot(3, 2, 5)
-    plt.scatter(range(len(actions)), actions[:,0], label='Transformer', color='red', s=10)
+    plt.scatter(range(len(actions[:2000])), actions[:2000,0], label='Transformer', color='red', s=10)
     if true_state_data is not None and true_ctrl_data is not None:
-        plt.scatter(range(len(true_actions)), true_actions[:,0], label='Reference', color='cyan', s=10)
+        plt.scatter(range(len(true_actions[:2000])), true_actions[:2000,0], label='Reference', color='cyan', s=10)
     # plt.title('Control Actions Over Time') if true_ctrl_data is None else plt.title(f'Predicted vs Reference Control Actions Over Time (Context: {context})')
     # plt.xlabel('Time Step')
     plt.xlabel('Time Step', fontsize=24)
@@ -242,9 +251,9 @@ def run_single_system(link_length1, link_length2, link_mass1, link_mass2, state_
     # plt.legend()
     # plt.legend(fontsize=16)
     plt.subplot(3, 2, 6)
-    plt.scatter(range(len(actions)), actions[:,1] + 1.0, label='Transformer', color='red', s=10)
+    plt.scatter(range(len(actions[:2000])), actions[:2000,1] + 1.0, label='Transformer', color='red', s=10)
     if true_state_data is not None and true_ctrl_data is not None:
-        plt.scatter(range(len(true_actions)), true_actions[:,1] + 1.0, label='Reference', color='cyan', s=10, alpha=0.5)
+        plt.scatter(range(len(true_actions[:2000])), true_actions[:2000,1] + 1.0, label='Reference', color='cyan', s=10, alpha=0.5)
     # plt.title('Control Labels Over Time') if true_ctrl_data is None else plt.title(f'Predicted vs Reference Control Labels Over Time (Context: {context})')
     # plt.xlabel('Time Step')
     plt.xlabel('Time Step', fontsize=24)
@@ -283,6 +292,7 @@ def run_single_system(link_length1, link_length2, link_mass1, link_mass2, state_
     # plt.tight_layout()
     # plt.savefig(os.path.join(path, 'states_and_controls.png'))
     plt.savefig(os.path.join(path, 'states_and_controls.pdf'), format='pdf', bbox_inches='tight')
+    plt.savefig(os.path.join(path, 'states_and_controls.png'), bbox_inches='tight')
     plt.close()
 
     return {

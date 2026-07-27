@@ -9,7 +9,9 @@ import pickle
 import matplotlib.pyplot as plt
 from gym_continuous_cartpole import ContinuousCartPoleEnv
 from gym_cartpole_swingup_lqr import swingup_lqr_controller
-
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
 
 def run_single_system(masscart, masspole, length, state_data, ctrl_data, run_idx, save_dir, context=None, true_state_data=None, true_ctrl_data=None):
     env = ContinuousCartPoleEnv(
@@ -110,7 +112,13 @@ def run_single_system(masscart, masspole, length, state_data, ctrl_data, run_idx
 
     # Save state plots
     plt.figure(figsize=(15, 8))
-    labels = ['Cart Position (x)', 'Cart Velocity (x_dot)', 'Pole Angle (theta)', 'Pole Angular Velocity (theta_dot)']
+    # labels = ['Cart Position (p)', 'Cart Velocity ($\dot{p}$)', 'Pole Angle ($\theta$)', 'Pole Angular Velocity ($\dot{theta}$)']
+    labels = [
+        r'Cart Position ($p$)', 
+        r'Cart Velocity ($\dot{p}$)', 
+        r'Pole Angle ($\theta$)', 
+        r'Pole Angular Velocity ($\dot{\theta}$)'
+    ]
     # colors = ['red', 'green', 'orange', 'purple']
     colors = ['red', 'red', 'red', 'red']
     for i in range(4):
@@ -237,6 +245,8 @@ def run_single_system(masscart, masspole, length, state_data, ctrl_data, run_idx
     # plt.tight_layout()
     # plt.savefig(os.path.join(path, 'states_and_controls.png'))
     plt.savefig(os.path.join(path, 'states_and_controls.pdf'), format='pdf', bbox_inches='tight')
+    #save png
+    plt.savefig(os.path.join(path, 'states_and_controls.png'), format='png', bbox_inches='tight')
     plt.close()
 
     return {
@@ -280,7 +290,7 @@ if __name__ == "__main__":
     step = 10000 #50000 #17000 #30000 #55000#274941 #300800
     save_dir = os.path.join(save_dir, f"step_{step}")
     os.makedirs(save_dir, exist_ok=True)
-    numberpend = 5 #3 #11 #10 #200 #5
+    numberpend = 100 #5 #3 #11 #10 #200 #5
     context = 50
     mode = 'indistr' # 'train', 'ood', 'indistr'
     case_type = 'passing_cases' # 'passing_cases', 'failure_cases'
@@ -290,7 +300,9 @@ if __name__ == "__main__":
     os.makedirs(save_dir, exist_ok=True)
 
     # counter = 0
-    for cartpole_idx in range(len(cartmasses)):
+    # for cartpole_idx in range(len(cartmasses)):
+    idxs_perm = np.random.permutation(len(cartmasses))[:10]
+    for cartpole_idx in idxs_perm:
         save_dir_inner = os.path.join(save_dir, f"run_{cartpole_idx:03}")
         print(f"Running cartpole {cartpole_idx+1}/{len(cartmasses)}")
         masscart = cartmasses[cartpole_idx]
@@ -305,11 +317,12 @@ if __name__ == "__main__":
                         #   state_data, ctrl_data, cartpole_idx, save_dir_inner)
         for i, context in enumerate(phase_data.keys()):
             # print(f"len(phase_data[{context}]): {len(phase_data[context])}")
+            # if i == 3:
             ground_truth_data_controls = data_and_controls[i][cartpole_idx]
             state_data = ground_truth_data_controls[0]
             ctrl_data = ground_truth_data_controls[1] #[:, 0]
             context_state_data = phase_data[context][cartpole_idx]
             context_ctrl_data = controls_data[context][cartpole_idx] #[:, 0]
             run_single_system(masscart, masspole, length, 
-                              context_state_data, context_ctrl_data, cartpole_idx, save_dir_inner, context=context, true_state_data=state_data, true_ctrl_data=ctrl_data)
+                            context_state_data, context_ctrl_data, cartpole_idx, save_dir_inner, context=context, true_state_data=state_data, true_ctrl_data=ctrl_data)
             
