@@ -45,6 +45,9 @@ def wrap_angle(angle):
     """
     return (angle + math.pi) % (2 * math.pi) - math.pi
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def _total_energy(theta1, theta2, d1, d2, m1, m2, l1, lc1, lc2, I1, I2, g=9.81):
     # small helper (matches your conventions)
@@ -223,6 +226,10 @@ def run_single_system(link_length1, link_length2, link_mass1, link_mass2, state_
         #     plt.scatter(range(len(states)), wrapped_states, label='Transformer', color=colors[i], s=10)
         # else:
         plt.scatter(range(len(states[:2000])), states[:2000, i], label='Transformer', color=colors[i], s=10)
+        ###################################
+        #7/27/2026: Phonix Code for RNN
+        # plt.scatter(range(len(states)), states[:, i], label='LSTM ' + labels[i], color=colors[i], s=10) 
+        ###################################
         if true_state_data is not None and true_ctrl_data is not None:
             plt.scatter(range(len(true_states[:2000])), true_states[:2000, i], label='Reference', color='cyan', s=10, alpha=0.5)
         # plt.title(labels[i] + ' Over Time') if true_state_data is None else plt.title(f'Model vs Reference {labels[i]} Over Time (Context: {context})')
@@ -238,6 +245,10 @@ def run_single_system(link_length1, link_length2, link_mass1, link_mass2, state_
 
     plt.subplot(3, 2, 5)
     plt.scatter(range(len(actions[:2000])), actions[:2000,0], label='Transformer', color='red', s=10)
+    ###################################
+    #7/27/2026: Phonix Code for RNN
+    # plt.scatter(range(len(actions)), actions[:,0], label='LSTM Control Actions', color='red', s=10)
+    ###################################
     if true_state_data is not None and true_ctrl_data is not None:
         plt.scatter(range(len(true_actions[:2000])), true_actions[:2000,0], label='Reference', color='cyan', s=10)
     # plt.title('Control Actions Over Time') if true_ctrl_data is None else plt.title(f'Predicted vs Reference Control Actions Over Time (Context: {context})')
@@ -252,6 +263,10 @@ def run_single_system(link_length1, link_length2, link_mass1, link_mass2, state_
     # plt.legend(fontsize=16)
     plt.subplot(3, 2, 6)
     plt.scatter(range(len(actions[:2000])), actions[:2000,1] + 1.0, label='Transformer', color='red', s=10)
+    ###################################
+    #7/27/2026: Phonix Code for RNN
+    # plt.scatter(range(len(actions)), actions[:,1], label='LSTM Control Labels', color='red', s=10)
+    ###################################
     if true_state_data is not None and true_ctrl_data is not None:
         plt.scatter(range(len(true_actions[:2000])), true_actions[:2000,1] + 1.0, label='Reference', color='cyan', s=10, alpha=0.5)
     # plt.title('Control Labels Over Time') if true_ctrl_data is None else plt.title(f'Predicted vs Reference Control Labels Over Time (Context: {context})')
@@ -340,16 +355,15 @@ if __name__ == "__main__":
     results = []
     save_dir = os.path.join(os.getcwd(), 'videos', 'acrobot_inference_gym_runs')
     os.makedirs(save_dir, exist_ok=True)
-    model_run_id = "efc700a2-0b51-4853-885d-557ba3c9d942" #"aa880853-841e-4b61-a7a7-9a3720482be2" #"e6ca8305-a383-4bc2-9f18-bd258dcc0183" #"15bf641c-dbc0-4f2f-b62f-fe04f568aacb" #"ec03ac2f-4708-4295-a44d-c14d439f7335" #"15bf641c-dbc0-4f2f-b62f-fe04f568aacb" #"d9d1d44a-9942-40b9-a2d4-bfba4177f2ce" ### finetuned lin layers chkpt #"15bf641c-dbc0-4f2f-b62f-fe04f568aacb" #"c953cb49-31b2-4829-8d1e-d9e2b1c99dce" #"056764e2-f56a-4e25-8019-3ce5098c388c" #"b3725997-9aee-4578-b668-d33e7cb29c4e" #"2ca9672c-582e-43ef-85cf-8550f325947a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"cf756e46-3ddb-4df7-9a13-ba850f495257" #"5b73d6c9-b526-4bfe-bab3-005f5369cf5a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"f8211c69-7ae8-47b3-9bd2-e<KEY>"#"de<KEY>" #"<KEY>"#"be<KEY>"#"eb<KEY>"#"a<KEY>"#"a<KEY>"#"<KEY>"#"<KEY>"#"be<KEY>"#"eb<KEY>"#"a<KEY>"#"a<KEY>"#"cf<KEY>"
+    model_run_id = "lstm_v4_h1024_e256_dropout0.2" #"e6ca8305-a383-4bc2-9f18-bd258dcc0183" #"15bf641c-dbc0-4f2f-b62f-fe04f568aacb" #"ec03ac2f-4708-4295-a44d-c14d439f7335" #"15bf641c-dbc0-4f2f-b62f-fe04f568aacb" #"d9d1d44a-9942-40b9-a2d4-bfba4177f2ce" ### finetuned lin layers chkpt #"15bf641c-dbc0-4f2f-b62f-fe04f568aacb" #"c953cb49-31b2-4829-8d1e-d9e2b1c99dce" #"056764e2-f56a-4e25-8019-3ce5098c388c" #"b3725997-9aee-4578-b668-d33e7cb29c4e" #"2ca9672c-582e-43ef-85cf-8550f325947a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"cf756e46-3ddb-4df7-9a13-ba850f495257" #"5b73d6c9-b526-4bfe-bab3-005f5369cf5a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"f8211c69-7ae8-47b3-9bd2-e<KEY>"#"de<KEY>" #"<KEY>"#"be<KEY>"#"eb<KEY>"#"a<KEY>"#"a<KEY>"#"<KEY>"#"<KEY>"#"be<KEY>"#"eb<KEY>"#"a<KEY>"#"a<KEY>"#"cf<KEY>"
     save_dir = os.path.join(save_dir, model_run_id)
     # os.makedirs(save_dir, exist_ok=True)
-    step = 300000 #135000 #300000 #135000 #50000 #395000 #230000 #90000 #250000 #90000 #125000 #255000 #260000 #284408 # 237346 #207672 #185000 #80000 #105000 #50000 #55000#274941 #300800
+    step = 300000 #395000 #230000 #90000 #250000 #90000 #125000 #255000 #260000 #284408 # 237346 #207672 #185000 #80000 #105000 #50000 #55000#274941 #300800
+    mode = "indistr"
     save_dir = os.path.join(save_dir, f"step_{step}")
     os.makedirs(save_dir, exist_ok=True)
-    numberpend = 6 #200 #5
-    context = 100
-    mode = 'indistr' # 'indistr, 'ood', 'train'
-    data_path = f'inference_run/mse_control_{step}_{model_run_id}/results_maxcontext{context}_numpends{numberpend}_{mode}_alexcode.pkl'
+    numberpend = 100 #200 #5
+    data_path = f'inference_run/acrobot_mse_control2_{step}_{model_run_id}/results_maxcontext50_numpends{numberpend}_{mode}_alexcode.pkl'
     # cartmasses, polemasses, polelengths, phase_data, controls_data, data_and_controls, pends = load_data(data_path)
     link_lengths1, link_lengths2, link_masses1, link_masses2, phase_data, controls_data, data_and_controls, pends = load_data(data_path)
     # save_dir = os.path.join(save_dir, f"indistr")

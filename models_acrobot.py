@@ -104,7 +104,7 @@ class TransformerModel(nn.Module):
         self.time_embedding = nn.Embedding(600, n_embd) #cartpole #800
         self.state_embedding = nn.Linear(n_dims, n_embd)
         self.control_embedding = nn.Linear(1, n_embd)
-        self.switch_embedding = nn.Embedding(3, n_embd)  # add embedding for switching controller for cartpole
+        self.switch_embedding = nn.Embedding(2, n_embd)  # add embedding for switching controller for cartpole
         # self.control_embedding = nn.Linear(2, n_embd)  # add label for switching controller for cartpole
         self.distance_embedding = nn.Linear(1, n_embd)  # add distance embedding for cartpole
 
@@ -113,13 +113,11 @@ class TransformerModel(nn.Module):
         self._backbone = GPT2Model(configuration)
         
         self._state_head = nn.Linear(n_embd, n_dims) #4/18/2025 cartpole
-        self.switch_head = nn.Linear(n_embd, 3)  # add label for switching controller for cartpole
+        self.switch_head = nn.Linear(n_embd, 1)  # add label for switching controller for cartpole
         # self._state_head = nn.Linear(n_embd, 2) #4/18/2025 pendulum and linear system
         self._control_head = nn.Linear(n_embd, 1) # no label for switching controller
         # self._control_head = nn.Linear(n_embd, 2)  # add label for switching controller for cartpole
 
-        self.register_buffer("cos_cached", None, persistent=False)
-        self.register_buffer("sin_cached", None, persistent=False)
     # @staticmethod
     # def _combine(xs_b, ys_b):
     #     """Interleaves the x's and the y's into a single sequence."""
@@ -176,25 +174,6 @@ class TransformerModel(nn.Module):
     #     # zs = torch.stack((xs_b_aug, ys_b_wide), dim=2)
     #     # zs = zs.view(bsize, 2 * points, dim+1)
     #     return zs
-
-    def apply_rotary_pos_emb(self, x, cos, sin):
-        # x shape: [batch, seq_len, n_embd]
-        # Split x into even and odd parts for rotation
-        x1 = x[..., 0::2]
-        x2 = x[..., 1::2]
-
-        cos = cos.unsqueeze(0)
-        sin = sin.unsqueeze(0)
-        # Rotate: [x1, x2] -> [x1*cos - x2*sin, x1*sin + x2*cos]
-        return torch.cat([x1 * cos - x2 * sin, x1 * sin + x2 * cos], dim=-1)
-
-    def get_cos_sin_embeddings(self, seq_len, n_embd, device):
-        # Standard RoPE frequency calculation
-        inv_freq = 1.0 / (10000 ** (torch.arange(0, n_embd, 2).float().to(device) / n_embd))
-        t = torch.arange(seq_len, device=device).type_as(inv_freq)
-        freqs = torch.einsum("i,j->ij", t, inv_freq)
-        # emb = torch.cat((freqs, freqs), dim=-1)
-        return freqs.cos(), freqs.sin()
 
     def forward(self, xs, ys=None, inds=None, inf="no"):
         """
@@ -263,32 +242,23 @@ class TransformerModel(nn.Module):
             #### embeddings for switching new code 6/24/2025
             # switch_embed = self.switch_embedding(switch_flag)
 
-            states_embed = states_embed #+ time_embed
+            states_embed = states_embed + time_embed
             # states_embed = states_embed + time_embed + switch_embed
-            controls_embed = controls_embed #+ time_embed
-            switch_embed = switch_embed #+ time_embed  # 5/25/2025 separate embeddings, add time embedding to switch embedding
-            distance_embed = distance_embed #+ time_embed
+            controls_embed = controls_embed + time_embed
+            switch_embed = switch_embed + time_embed  # 5/25/2025 separate embeddings, add time embedding to switch embedding
+            distance_embed = distance_embed + time_embed
 
             # stacked_inputs = torch.stack((states_embed, controls_embed), dim=2)
             # zs = stacked_inputs.view(xs_b.shape[0], 2 * xs_b.shape[1], -1)
             stacked_inputs = torch.stack((states_embed, distance_embed, switch_embed, controls_embed), dim=2)
             zs = stacked_inputs.view(xs_b.shape[0], 4 * xs_b.shape[1], -1)
-
-            # 2/22/2026: adding Rotary Positional Embeddings (RoPE) for better generalization to longer sequences at inference time
-            if self.cos_cached is None or self.cos_cached.shape[0] < zs.shape[1] or self.cos_cached.device != zs.device:
-                cos, sin = self.get_cos_sin_embeddings(zs.shape[1], zs.shape[2], zs.device)
-                self.cos_cached = cos
-                self.sin_cached = sin
-            zs = self.apply_rotary_pos_emb(zs, self.cos_cached[:zs.shape[1], :], self.sin_cached[:zs.shape[1], :])
             zs = self.embed_ln(zs)  # Apply layer normalization to the combined embeddings
 
             output = self._backbone(inputs_embeds=zs).last_hidden_state
 
             control_prediction = self._control_head(output[:, ::4, :])  # Control predictions
             switch_logits = self.switch_head(output[:, ::4, :])
-            state_prediction = self._state_head(output[:, ::4, :])  # State predictions
-            # tanh for control
-            # control_prediction = torch.tanh(control_prediction)*3.1622 # using with sqrt scaling for control, 2/23/2026 ebonye
+            state_prediction = self._state_head(output[:, 3::4, :])  # State predictions
             return control_prediction, state_prediction, switch_logits
             # return control_prediction[:, :, 0], state_prediction, control_prediction[:, :, 1]  # Return control and state predictions, and switch logits
 
@@ -320,11 +290,11 @@ class TransformerModel(nn.Module):
 
        
 
-        states_embed = states_embed #+ time_embed
+        states_embed = states_embed + time_embed
         # states_embed = states_embed + time_embed + switch_embed
-        controls_embed = controls_embed #+ time_embed
-        distance_embed = distance_embed #+ time_embed
-        switch_embed = switch_embed #+ time_embed  # 5/25/2025 separate embeddings, add time embedding to switch embedding
+        controls_embed = controls_embed + time_embed
+        distance_embed = distance_embed + time_embed
+        switch_embed = switch_embed + time_embed  # 5/25/2025 separate embeddings, add time embedding to switch embedding
         # stacked_inputs = torch.stack((states_embed, controls_embed), dim=2) 
         # print(f"states_embed shape: {states_embed.shape}")
         # print(f"controls_embed shape: {controls_embed.shape}")
@@ -332,23 +302,14 @@ class TransformerModel(nn.Module):
         stacked_inputs = torch.stack((states_embed, distance_embed, switch_embed, controls_embed), dim=2)  # 5/25/2025 separate embeddings, add switch embedding
         # zs = stacked_inputs.view(xs.shape[0], 2 * xs.shape[1], -1) 
         zs = stacked_inputs.view(xs.shape[0], 4 * xs.shape[1], -1)
-
-        # 2/22/2026: adding Rotary Positional Embeddings (RoPE) for better generalization to longer sequences at inference time
-        if self.cos_cached is None or self.cos_cached.shape[0] < zs.shape[1] or self.cos_cached.device != zs.device:
-            cos, sin = self.get_cos_sin_embeddings(zs.shape[1], zs.shape[2], zs.device)
-            self.cos_cached = cos
-            self.sin_cached = sin
-        zs = self.apply_rotary_pos_emb(zs, self.cos_cached[:zs.shape[1], :], self.sin_cached[:zs.shape[1], :])
         zs = self.embed_ln(zs)  # Apply layer normalization to the combined embeddings
 
         output = self._backbone(inputs_embeds=zs).last_hidden_state
 
         control_prediction = self._control_head(output[:, ::4, :])  # Control predictions
         switch_logits = self.switch_head(output[:, ::4, :])  # Switch predictions
-        state_prediction = self._state_head(output[:, ::4, :])  # State predictions
-        # tanh for control
-        # control_prediction = torch.tanh(control_prediction)*3.1622 # using with sqrt scaling for control, 2/23/2026 ebonye
-            
+        state_prediction = self._state_head(output[:, 3::4, :])  # State predictions
+
         # # zs = self._combine(xs, ys)
         # zs = self._combine_ebonye(xs, ys) 
 
@@ -740,107 +701,3 @@ class XGBoostModel:
             preds.append(pred)
 
         return torch.stack(preds, dim=1)
-
-class RNNModel(nn.Module):
-    """
-    RNN with prediction heads for state, mode, and control input.
-    - v1 : ReLU on embeddings, pred st+1 with at+1 ; predicts (st+1, at, mt) with (st, at, mt)
-    - v2 : No ReLU, pred st+1 directly from ht ; predicts (st+1, at, mt) with (st, at, mt)
-    - v3 : v2 ; predicts (st+1, at, mt) with (st, at-1, mt-1)
-    - | Knowing where we are at and what got us there should be enough to capture dynamics.
-    - v4 : pass in (s1, m1, a1, s2, m2, a2, ..., st, mt, at) and use hidden states corresponding to sk to predict sk+1, ak, mk
-    - | This is analogous to using the transformer embedding for sk to predict sk+1, ak, mk
-    """
-    def __init__(self, n_dims : dict, hidden_size : int, num_layers : int, cell_type : str, n_embd=256):
-        super(RNNModel, self).__init__()
-        assert cell_type in ['rnn', 'lstm', 'gru']
-        self.n_dims = n_dims
-
-        # Gemini Recommendation: embed covariates to avoid type inconsistency
-        self.s_embd = nn.Linear(n_dims['state'], n_embd)
-        self.d_embd = nn.Linear(n_dims['distance'], n_embd)
-        self.m_embd = nn.Embedding(n_dims['mode'], n_embd)
-        self.a_embd = nn.Linear(n_dims['control'], n_embd)
-
-        if cell_type == 'rnn':
-            self.rnn = nn.RNN(input_size=n_embd, 
-                            hidden_size=hidden_size,
-                            num_layers=num_layers,
-                            batch_first=True,
-                            dropout=0.2)
-        elif cell_type == 'gru':
-            self.rnn = nn.GRU(input_size=n_embd, 
-                            hidden_size=hidden_size,
-                            num_layers=num_layers,
-                            batch_first=True,
-                            dropout=0.2)
-        elif cell_type == 'lstm':
-            self.rnn = nn.LSTM(input_size=n_embd, 
-                            hidden_size=hidden_size,
-                            num_layers=num_layers,
-                            batch_first=True,
-                            dropout=0.2)
-
-        # --- 3/27/26 12pm: See changes below to state prediction
-        # self.head_s = nn.Linear(hidden_size + n_dims['control'], n_dims['state'])
-        
-        self.head_s = nn.Linear(hidden_size, n_dims['state'])
-        self.head_m = nn.Linear(hidden_size, n_dims['mode'])
-        self.head_a = nn.Linear(hidden_size, n_dims['control'])
-
-        self.input_ln = nn.LayerNorm(n_embd)
-
-        # Runs on CPU, ~minutes of overhead
-        for name, param in self.rnn.named_parameters():
-            if 'weight' in name:
-                nn.init.orthogonal_(param)
-
-    def forward(self, s, m, a, inf=False):
-        """
-        Inputs:
-            - s : s_{1:t} sequence of states (batch_size, seq_length, 6)          
-            - m : m_{1:t} sequence of modes (batch_size, seq_length, 1)         
-            - a : a_{1:t} sequence of control inputs (batch_size, seq_length, 1)   
-            - inf : inference mode (T/F)
-
-        Outputs:
-            - s_pred : ^s_{2:t+1} predicted sequence of states (batch_size, seq_length, 6)
-            - m_logits : ^m_{1:t} sequence of mode logits (batch_size, seq_length, 1)
-            - a_pred : ^a_{1:t} predicted sequence of control inputs (batch_size, seq_length, 1)
-        """
-        goal_state = torch.tensor([-1.0, 0.0, 1.0, 0.0, 0.0, 0.0], device=s.device) 
-        d = torch.norm(s - goal_state, dim=-1, keepdim=True)
-
-        # e_s = torch.relu(self.s_embd(s))
-        # e_d = torch.relu(self.d_embd(d))
-        # e_m = self.m_embd(m.long()).squeeze(2)
-        # e_a = torch.relu(self.a_embd(a))
-        # --- 3/27/26 12pm : NO RELU! Data normalized around origin, crushing half 
-        e_s = self.s_embd(s)
-        e_d = self.d_embd(d)
-        e_m = self.m_embd(m.long().squeeze(-1))
-        e_a = self.a_embd(a)
-
-        # x = torch.cat((e_s, e_d, e_m, e_a), dim=-1)
-        # --- 3/31/26 1pm : We want (s1, d1, m1, a1, s2, d2, m2, a2, ..., st, dt, mt, at) now.
-
-        x = torch.stack((e_s, e_d, e_m, e_a), dim=2) # x : (B, L, 4, D)
-        x = x.reshape(s.shape[0], 4 * s.shape[1], -1) # x : (B, 4L, D)
-        x = self.input_ln(x)
-
-        # Uses teacher-forcing by default.
-        out, _ = self.rnn(x) # out : (B, 4L, hidden_size)
-
-        # Only get hidden states associated with states
-        out = out[:, ::4, :] # out : (B, L, hidden_size)
-
-        if inf:
-            out = out[:, -1, :] # Take h_t' associated with s_t
-
-        m_logits = self.head_m(out)
-        a_pred = self.head_a(out) 
-        # --- 3/27/26 12pm : Error accumulation? Could revisit.
-        # s_pred = self.head_s(torch.cat((out, a_pred), dim=-1))
-        s_pred = self.head_s(out) 
-
-        return s_pred, m_logits, a_pred

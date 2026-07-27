@@ -1,8 +1,8 @@
 models/test
 models/cartpole
+models/cartpole_rnn
 models/cartpole_cos_sin_theta
 models/cartpole_cos_sin_theta_finetune
-inference_run/
 __pycache__/
 cartpole_optimal_trajectory.py
 cartpole_swingup_lqr.py
@@ -42,6 +42,7 @@ gym_acrobot_swingup_lqr.py
 # gym_cartpole_test.py
 # gym_continuous_acrobot.py
 # gym_continuous_cartpole.py
+inference_run/
 job.sh
 job2.sh
 # job_train.sh

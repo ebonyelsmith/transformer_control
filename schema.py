@@ -14,12 +14,16 @@ from funcy import merge
 
 
 model_schema = {
-    "family": merge(tstring, allowed(["gpt2", "lstm"])),
-    "n_positions": merge(tinteger, required),  # maximum context length
-    "n_dims": merge(tinteger, required),  # latent dimension
+    "family": merge(tstring, allowed(["gpt2", "lstm", "rnn"])),
+    "n_positions": merge(tinteger, nullable, default(None)),  # maximum context length, not needed for RNN
+    "n_dims": merge(tinteger, nullable, default(None)),  # latent dimension, for GPT/LSTM
+    "ndims": merge(tdict, nullable, default(None)),  # for RNN, dict of dimensions
     "n_embd": merge(tinteger, required),
-    "n_layer": merge(tinteger, required),
-    "n_head": merge(tinteger, required),
+    "n_layer": merge(tinteger, nullable, default(None)),
+    "n_head": merge(tinteger, nullable, default(None)),
+    "num_layers": merge(tinteger, nullable, default(None)),
+    "cell_type": merge(tstring, allowed(['rnn', 'lstm', 'gru']), default(None)),
+    "hidden_size": merge(tinteger, nullable, default(None)),  # for RNN
 }
 
 curriculum_base_schema = {
@@ -66,6 +70,7 @@ wandb_schema = {
     "notes": merge(tstring, default("")),
     "name": merge(tstring, nullable, default(None)),
     "log_every_steps": merge(tinteger, default(10)),
+    "log_val_every_steps": merge(tinteger, default(5000))
 }
 
 schema = {

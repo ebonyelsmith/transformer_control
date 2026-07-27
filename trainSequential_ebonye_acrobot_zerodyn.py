@@ -111,8 +111,8 @@ def train_step(model, xs, ys, optimizer, loss_func, i, args, numtrainingsteps, b
 
     ys_scaled_for_model = ys_scaled.clone()
     ys_scaled_for_model[..., 1] = ys_scaled_for_model[..., 1] + 1
-    # output_controls, output_states, switch_logits = model(xs_scaled, ys_scaled_for_model) #4/19/2026 no state head ablation
-    output_controls, switch_logits = model(xs_scaled, ys_scaled_for_model) #4/19/2026 no state head ablation
+    output_controls, output_states, switch_logits = model(xs_scaled, ys_scaled_for_model) #4/19/2026 no state head ablation
+    # output_controls, switch_logits = model(xs_scaled, ys_scaled_for_model) #4/19/2026 no state head ablation
     
 
 
