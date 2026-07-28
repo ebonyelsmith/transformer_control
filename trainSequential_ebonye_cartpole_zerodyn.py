@@ -11,8 +11,8 @@ import tasks
 from curriculum import Curriculum
 from schema import schema
 # from models import build_model
-# from models_cartpole import build_model #4/19/2026 no state head ablation
-from models_cartpole_nostatehead import build_model
+from models_cartpole import build_model #4/19/2026 no state head ablation
+# from models_cartpole_nostatehead import build_model
 import wandb
 import pickle
 import random
@@ -114,14 +114,14 @@ def train_step(model, xs, ys, optimizer, loss_func, i, args, numtrainingsteps, b
     ys_scaled_for_model = ys_scaled.clone()
     ys_scaled_for_model[..., 1] = ys_scaled_for_model[..., 1] + 1  # Convert -1, 0, 1 to 0, 1, 2 for model input
 
-    # output_controls, output_states, switch_logits = model(xs_scaled, ys_scaled_for_model) #4/19/2026 no state head ablation
-    output_controls, switch_logits = model(xs_scaled, ys_scaled_for_model)
+    output_controls, output_states, switch_logits = model(xs_scaled, ys_scaled_for_model) 
+    # output_controls, switch_logits = model(xs_scaled, ys_scaled_for_model) #4/19/2026 no state head ablation
     
 
 
     # output = [output_controls.detach(), output_states.detach()]
-    # output = [output_controls.detach(), output_states.detach(), switch_logits.detach()] #4/19/2026 no state head ablation
-    output = [output_controls.detach(), switch_logits.detach()] 
+    output = [output_controls.detach(), output_states.detach(), switch_logits.detach()]
+    # output = [output_controls.detach(), switch_logits.detach()]  #4/19/2026 no state head ablation
 
     # import pdb; pdb.set_trace()
 
@@ -138,8 +138,8 @@ def train_step(model, xs, ys, optimizer, loss_func, i, args, numtrainingsteps, b
     # loss_controls = (output_controls.squeeze(-1)[:,:-1] - ys_scaled[..., 0]).pow(2)
     
     
-    # xs_scaled = xs_scaled.to(output_states.device) #4/19/2026 no state head ablation
-    # loss_states = loss_func(output_states[:,:-1], xs_scaled[:,1:]) #4/19/2026 no state head ablation
+    xs_scaled = xs_scaled.to(output_states.device) #4/19/2026 no state head ablation
+    loss_states = loss_func(output_states[:,:-1], xs_scaled[:,1:]) #4/19/2026 no state head ablation
     
    
 
@@ -153,11 +153,11 @@ def train_step(model, xs, ys, optimizer, loss_func, i, args, numtrainingsteps, b
 
     # loss = loss_controls + loss_states
     alpha_controls = 1.0
-    # alpha_states = 5.0 #4/19/2026 no state head ablation
+    alpha_states = 5.0 #4/19/2026 no state head ablation
     alpha_switch = 1.0
     # loss = loss_controls + loss_states + loss_switch
-    # loss = alpha_controls * loss_controls + alpha_states * loss_states + alpha_switch * loss_switch #4/19/2026 no state head ablation
-    loss = alpha_controls * loss_controls + alpha_switch * loss_switch
+    loss = alpha_controls * loss_controls + alpha_states * loss_states + alpha_switch * loss_switch
+    # loss = alpha_controls * loss_controls + alpha_switch * loss_switch #4/19/2026 no state head ablation
     
     # import pdb; pdb.set_trace()
 
@@ -847,13 +847,14 @@ if __name__ == "__main__":
         with open(os.path.join(args.out_dir, "config.yaml"), "w") as yaml_file:
             yaml.dump(args.__dict__, yaml_file, default_flow_style=False)
 
-        # model_source_path = "models_cartpole.py" # 4/19/2026 no state head ablation
-        # model_dest_path = os.path.join(args.out_dir, "models_cartpole.py") # 4/19/2026 no state head ablation
-        # shutil.copy(model_source_path, model_dest_path) # 4/19/2026 no state head ablation
+        # Copy the model file to the output directory
+        model_source_path = "models_cartpole.py" # 4/19/2026 no state head ablation
+        model_dest_path = os.path.join(args.out_dir, "models_cartpole.py") # 4/19/2026 no state head ablation
+        shutil.copy(model_source_path, model_dest_path) # 4/19/2026 no state head ablation
 
-        model_source_path = "models_cartpole_nostatehead.py"
-        model_dest_path = os.path.join(args.out_dir, "models_cartpole_nostatehead.py")
-        shutil.copy(model_source_path, model_dest_path)
+        # model_source_path = "models_cartpole_nostatehead.py"
+        # model_dest_path = os.path.join(args.out_dir, "models_cartpole_nostatehead.py")
+        # shutil.copy(model_source_path, model_dest_path)
 
         train_source_path = "trainSequential_ebonye_cartpole_zerodyn.py"
         train_dest_path = os.path.join(args.out_dir, "trainSequential_ebonye_cartpole_zerodyn.py")
