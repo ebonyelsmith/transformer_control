@@ -34,7 +34,7 @@ training:
             interval: 2000000000000
 
 wandb:
-    name: "new cartpole RoPE without lqr noise, added time embeddings, control, state, switch head, distance to goal embedding, cos_sin theta"
+    name: "fixedpe cartpole RoPE without lqr noise, added time embeddings, control, state, switch head, distance to goal embedding, cos_sin theta"
     entity: "ebonyesmith-uc-berkeley-electrical-engineering-computer-" #"afrias5"
     project: "test"
 
@@ -52,7 +52,7 @@ dataset_test_logger_textfile: "dataset_test_logger.txt"
 dataset_test_outofdistr_logger_textfile: "dataset_test_outofdistr_logger.txt"
 
 
-out_dir: ./models/cartpole_cos_sin_theta #Where to store model checkpoints
+out_dir: ./models/fixedpe_cartpole_cos_sin_theta #Where to store model checkpoints
 # out_dir: ./models/cartpole_cos_sin_theta_finetune #Where to store model checkpoints
 model_logger_textfile: "testing.txt"   #Name of txt file to save training info. Located it out_dir
 test_run: False              # For debugging, this will not save checkpoints or log to wandb

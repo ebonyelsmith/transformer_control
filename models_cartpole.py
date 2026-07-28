@@ -84,7 +84,7 @@ def get_relevant_baselines(task_name):
 
 
 class TransformerModel(nn.Module):
-    def __init__(self, n_dims, n_positions, n_embd=256, n_layer=12, n_head=8):
+    def __init__(self, n_dims, n_positions, n_embd=256, n_layer=12, n_head=8, use_wpe=False): # use_wpe = True for results in the paper, use_wpe = False for ablation study
         super(TransformerModel, self).__init__()
         configuration = GPT2Config(
             n_positions=3 * n_positions,
@@ -112,6 +112,9 @@ class TransformerModel(nn.Module):
         self.embed_ln = nn.LayerNorm(n_embd, eps=1e-5)
 
         self._backbone = GPT2Model(configuration)
+        if not use_wpe: 
+            self._backbone.wpe.weight.data.zero_()
+            self._backbone.wpe.weight.requires_grad = False
         
         self._state_head = nn.Linear(n_embd, n_dims) #4/18/2025 cartpole
         self.switch_head = nn.Linear(n_embd, 3)  # add label for switching controller for cartpole
