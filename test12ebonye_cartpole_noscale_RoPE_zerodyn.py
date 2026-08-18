@@ -13,25 +13,25 @@ import ipdb
 import traceback
 import random
 import math
-import generate_dataset
+# import generate_dataset
 from scipy.integrate import solve_ivp
 import pickle
 import re
 
 
 
-plot_label = 'nozerodyntrain_zerodyninf'
+plot_label = 'all_stable_cartpole_noscale_RoPE_zerodyn'
 phase_plot_label = 'mse_control_phaseplot'
 mse_plot_label = 'mse_control_mseplot'
 save_results = "trainsteps_test_mse_control.txt"
 save_phase_plot = "trainsteps_test_mse_control.txt"
 log_info = "trainsteps_log_mse_control.txt"
-model_name= "cartpole_cos_sin_theta" #"cartpole_cos_sin_theta" #"cartpole" #"test"
-model_run_id= "5a28bfa8-c81f-473b-996f-879dfadc62df" #"42ce9ab0-9db7-41c1-b944-59424adef6a7" #"fc5cb0fe-d4c6-4fba-8196-01a37d611194" #"5a28bfa8-c81f-473b-996f-879dfadc62df" #"3f8379cf-1cf0-47db-9210-5abb1c43e5fb" #"b3725997-9aee-4578-b668-d33e7cb29c4e" #"2ca9672c-582e-43ef-85cf-8550f325947a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"cf756e46-3ddb-4df7-9a13-ba850f495257" #"5b73d6c9-b526-4bfe-bab3-005f5369cf5a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"c7978c77-a2d6-4d87-a256-d42690204829" #"f8211c69-7ae8-47b3-9bd2-e4f0edda1e82" #"de00c432-078f-44d1-8cc9-e6ab0dfdca88" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"c3af70ca-3733-4cec-a876-95db9bc9a593" #"32ea0675-5539-4d02-80fb-7bfe1f4c263e" #"57f687d9-9e41-48f5-83d4-559592ca762b" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"be268b82-d25e-4026-b303-91ba3c6d1e9f" 
+model_name= "cartpole_cos_sin_theta" #"fixedpe_cartpole_cos_sin_theta" #"cartpole_cos_sin_theta" #"cartpole" #"test"
+model_run_id= "fc5cb0fe-d4c6-4fba-8196-01a37d611194" #"bf814070-7c14-4306-9e9e-d5c6ed352f7c" #"5a28bfa8-c81f-473b-996f-879dfadc62df" #"42ce9ab0-9db7-41c1-b944-59424adef6a7" #"fc5cb0fe-d4c6-4fba-8196-01a37d611194" #"5a28bfa8-c81f-473b-996f-879dfadc62df" #"3f8379cf-1cf0-47db-9210-5abb1c43e5fb" #"b3725997-9aee-4578-b668-d33e7cb29c4e" #"2ca9672c-582e-43ef-85cf-8550f325947a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"cf756e46-3ddb-4df7-9a13-ba850f495257" #"5b73d6c9-b526-4bfe-bab3-005f5369cf5a" #"a1d5f223-6768-4134-934b-4879031f7ea1" #"c7978c77-a2d6-4d87-a256-d42690204829" #"f8211c69-7ae8-47b3-9bd2-e4f0edda1e82" #"de00c432-078f-44d1-8cc9-e6ab0dfdca88" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"c3af70ca-3733-4cec-a876-95db9bc9a593" #"32ea0675-5539-4d02-80fb-7bfe1f4c263e" #"57f687d9-9e41-48f5-83d4-559592ca762b" #"457c45df-8c2f-4ac1-9b4e-e77eeed90f3a" #"be268b82-d25e-4026-b303-91ba3c6d1e9f" 
 # model_checkpoint_step= 40000 #30000 #55000 #274941 #195000 #5000 #15000 #274941 #115000 #300800 #204800 #102400
 model_checkpoint_epoch = 1 #25 #59 #125 #14 #38 #60 #125
 # folder_name = f"inference_run/{plot_label}_{model_checkpoint_step}_{model_run_id}"
-mode = 'ood_hard' # 'train', 'ood', 'indistr'
+# mode = 'ood_hard' # 'train', 'ood', 'indistr'
 
     
 
@@ -611,7 +611,7 @@ def main(
         phase_data,
         controls_data,
         data_and_controls,
-        ):
+        mode):
     """_summary_
     """
     model, _ = load_model(
@@ -659,6 +659,14 @@ def main(
         base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges_zero_dyn/picklefolder_test_outofdistr"
         # base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges_zero_dyn_harderOOD/picklefolder_test_outofdistr"
         # pickle_file = "batch_test_0.pkl"
+        pends = [3,   5,   7,   9,  10,  12,  13,  15,  16,  17,  19,  20,  21,  22,
+         23,  25,  26,  28,  33,  36,  37,  38,  39,  44,  49,  51,  53,  55,
+         56,  57,  58,  59,  63,  64,  65,  67,  70,  74,  75,  77,  80,  81,
+         88,  89,  95,  97,  98, 101, 102, 104, 105, 108, 109, 110, 112, 113,
+        115, 117, 119, 122, 123, 124, 126, 130, 132, 135, 136, 139, 141, 142,
+        144, 145, 146, 149, 151, 155, 157, 158, 161, 163, 164, 167, 168, 171,
+        172, 174, 175, 182, 184, 186, 188, 194, 197, 199, 201, 203, 205, 206,
+        209, 210]
         pickle_file = f"batch_test_0_{number_of_context}.pkl"
     elif mode == 'ood_hard':
         # base_dir = f"/data/esmith/Dataset_LinearSystem_ICL/picklefolder_test_outofdistr_hard"
@@ -667,6 +675,14 @@ def main(
         # base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges/picklefolder_test_outofdistr_hard"
         # base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges_zero_dyn/picklefolder_test_outofdistr"
         base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges_zero_dyn_harderOOD/picklefolder_test_outofdistr"
+        pends = [3, 10, 13, 15, 18, 19, 20, 23, 31, 32, 33, 36, 39, 41, 
+                     46, 51, 53, 56, 57, 58, 61, 65, 67, 71, 73, 75, 77, 78,
+                     80, 81, 82, 84, 85, 94, 95, 96, 97, 102, 104, 105, 108, 110,
+                     116, 119, 127, 128, 130, 135, 137, 141, 143, 146, 147, 150, 151, 152,
+                     157, 161, 163, 172, 174, 177, 179, 183, 184, 186, 191, 197, 199, 204,
+                     206, 207, 214, 217, 218, 221, 222, 224, 225, 226, 230, 231, 234, 235,
+                     237, 244, 245, 247, 248, 252, 253, 260, 262, 265, 270, 272, 275, 278,
+                     286, 288]
         # pickle_file = "batch_test_0.pkl"
         pickle_file = f"batch_test_0_{number_of_context}.pkl"
     elif mode == 'indistr':
@@ -680,6 +696,14 @@ def main(
         base_dir = f"/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges_zero_dyn/picklefolder_test_indistr"
         # pickle_file = "batch_test_0.pkl"
         # pickle_file = "batch_test_1.pkl"
+        pends = [0,   1,   3,   4,   5,   7,   8,   9,  10,  11,  12,  13,  14,  15,
+         16,  17,  19,  21,  22,  23,  24,  25,  27,  28,  30,  31,  32,  33,
+         34,  36,  39,  40,  41,  42,  43,  44,  45,  46,  47,  49,  50,  51,
+         55,  56,  57,  60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  70,
+         71,  73,  74,  75,  76,  77,  78,  80,  81,  82,  83,  84,  85,  86,
+         87,  88,  89,  91,  92,  93,  95,  96,  97,  99, 101, 102, 103, 104,
+        105, 106, 107, 108, 110, 111, 114, 115, 116, 117, 118, 119, 120, 121,
+        122, 123]
         pickle_file = f"batch_test_0_{number_of_context}.pkl"
     elif mode == 'train':
         # base_dir = f"/data/esmith/Dataset_LinearSystem_ICL/picklefolder"
@@ -697,30 +721,31 @@ def main(
     with open(file_path_test_data, "rb") as f:
         xs, ys, cartmasses, polemasses, polelenghs = pickle.load(f)
         
-    # goal_state = torch.tensor([0.0, 0.0, 1.0, 0.0, 0.0], device=device)  # [x, x_dot, cos(theta), sin(theta), theta_dot]
-    # goal_threshold = 0.1  # Threshold for goal state
+    # # goal_state = torch.tensor([0.0, 0.0, 1.0, 0.0, 0.0], device=device)  # [x, x_dot, cos(theta), sin(theta), theta_dot]
+    # # goal_threshold = 0.1  # Threshold for goal state
 
-    xs_cos_tensor = torch.cos(xs[:, :, 2])  # Cosine of theta
-    xs_sin_tensor = torch.sin(xs[:, :, 2])  # Sine of theta
-    xs_updated = torch.cat((xs[:, :, :2], xs_cos_tensor.unsqueeze(-1), xs_sin_tensor.unsqueeze(-1), xs[:, :, 3:]), dim=-1)  # Update xs with cos and sin of theta
-    # mask = torch.norm(xs_updated[:, -1, :5] - goal_state, dim=-1) < goal_threshold  # Check if the last state is close to the goal state
+    # xs_cos_tensor = torch.cos(xs[:, :, 2])  # Cosine of theta
+    # xs_sin_tensor = torch.sin(xs[:, :, 2])  # Sine of theta
+    # xs_updated = torch.cat((xs[:, :, :2], xs_cos_tensor.unsqueeze(-1), xs_sin_tensor.unsqueeze(-1), xs[:, :, 3:]), dim=-1)  # Update xs with cos and sin of theta
+    # # mask = torch.norm(xs_updated[:, -1, :5] - goal_state, dim=-1) < goal_threshold  # Check if the last state is close to the goal state
     
-    final_window = xs_updated[:, -40:, :]  # Get the last 40 time steps
-    cos_theta_thresh = 0.9
-    sin_theta_thresh = 0.5
-    theta_dot_thresh = 1.0
-    is_upright = (torch.abs(final_window[:, :, 2]) > cos_theta_thresh) & \
-                (torch.abs(final_window[:, :, 3]) < sin_theta_thresh) & \
-                (torch.abs(final_window[:, :, 4]) < theta_dot_thresh)  # Check if the pendulum is upright
-    mask = is_upright.all(dim=1)  # Check if all time steps
+    # final_window = xs_updated[:, -40:, :]  # Get the last 40 time steps
+    # cos_theta_thresh = 0.9
+    # sin_theta_thresh = 0.5
+    # theta_dot_thresh = 1.0
+    # is_upright = (torch.abs(final_window[:, :, 2]) > cos_theta_thresh) & \
+    #             (torch.abs(final_window[:, :, 3]) < sin_theta_thresh) & \
+    #             (torch.abs(final_window[:, :, 4]) < theta_dot_thresh)  # Check if the pendulum is upright
+    # mask = is_upright.all(dim=1)  # Check if all time steps
 
 
-    all_pends = torch.where(mask)[0].cpu().numpy()  # Get indices of pendulums that meet the goal state condition
-    # choose pendulums that do not meet the goal state condition for more challenging inference
-    # all_pends = torch.where(~mask)[0].cpu().numpy()  # Get indices of pendulums that do not meet the goal state condition
+    # all_pends = torch.where(mask)[0].cpu().numpy()  # Get indices of pendulums that meet the goal state condition
+    # # choose pendulums that do not meet the goal state condition for more challenging inference
+    # # all_pends = torch.where(~mask)[0].cpu().numpy()  # Get indices of pendulums that do not meet the goal state condition
     
-    # pends = np.random.choice(all_pends, size=Num_of_pendulums, replace=False)  # Randomly select pendulums from those that meet the goal state condition
-    pends = np.arange(Num_of_pendulums)
+    # # pends = np.random.choice(all_pends, size=Num_of_pendulums, replace=False)  # Randomly select pendulums from those that meet the goal state condition
+    # # pends = np.arange(Num_of_pendulums)
+    
     # import pdb; pdb.set_trace()
 
     cartmasses = [cartmasses[i] for i in pends]
@@ -879,34 +904,37 @@ try:
     Num_of_contexts = [1, 5, 10, 25, 50]
     # Num_of_contexts = [5]
 
+    modes = ["indistr", "ood_easy", "ood_hard"]
 
-    for step in tqdm(model_checkpoint_step_list, desc="Checkpoint Steps"):
-        model_checkpoint_step = int(step)
-        folder_name = f"inference_run/{plot_label}_{model_checkpoint_step}_{model_run_id}"
+    for mode in modes:
+        for step in tqdm(model_checkpoint_step_list, desc="Checkpoint Steps"):
+            model_checkpoint_step = int(step)
+            folder_name = f"inference_run/{plot_label}_{model_checkpoint_step}_{model_run_id}"
 
-        phase_data = {context_length: [] for context_length in Num_of_contexts}
-        controls_data = {context_length: [] for context_length in Num_of_contexts}
-        data_and_controls = []
+            phase_data = {context_length: [] for context_length in Num_of_contexts}
+            controls_data = {context_length: [] for context_length in Num_of_contexts}
+            data_and_controls = []
 
-        for Num_of_context in Num_of_contexts:
-            print(f"Running inference for checkpoint step {model_checkpoint_step} with context length {Num_of_context}...")
+            for Num_of_context in Num_of_contexts:
+                print(f"Running inference for checkpoint step {model_checkpoint_step} with context length {Num_of_context} and mode {mode}...")
+                
+                results = main(model_checkpoint_step,
+                                folder_name,
+                                Num_of_context,
+                                # mse_results,
+                                # mse_control_results,
+                                phase_data,
+                                controls_data,
+                                data_and_controls, 
+                                mode                         
+                            ) 
+                _, _, _, phase_data, controls_data, data_and_controls, pends = results
+
             
-            results = main(model_checkpoint_step,
-                            folder_name,
-                            Num_of_context,
-                            # mse_results,
-                            # mse_control_results,
-                            phase_data,
-                            controls_data,
-                            data_and_controls,                          
-                           ) 
-            _, _, _, phase_data, controls_data, data_and_controls, pends = results
+                save_results = os.path.join(folder_name, f"results_maxcontext{Num_of_context}_numpends{Num_of_pendulums}_{mode}_alexcode.pkl")
 
-        
-        save_results = os.path.join(folder_name, f"results_maxcontext{Num_of_context}_numpends{Num_of_pendulums}_{mode}_alexcode.pkl")
-
-        with open(save_results, "wb") as f:
-            pickle.dump(results, f)
+                with open(save_results, "wb") as f:
+                    pickle.dump(results, f)
 
 
     print("done")   
