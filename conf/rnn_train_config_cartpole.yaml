@@ -39,15 +39,17 @@ training:
             interval: 2000000000000
 
 wandb:
-    name: "rnn_baseline"
-    entity: "wisph8-uc-berkeley-electrical-engineering-computer-sciences"
+    # name: "rnn_baseline"
+    # entity: "wisph8-uc-berkeley-electrical-engineering-computer-sciences"
+    name: "fixed cartpole RoPE PE without lqr noise, added time embeddings, control, state, switch head, distance to goal embedding, cos_sin theta"
+    entity: "ebonyesmith-uc-berkeley-electrical-engineering-computer-" #"afrias5"
     project: "rnn baseline for cartpole system (real)"
 
 
 
 
 # dataset_filesfolder: "./dataset_pendulum" #Folder that stores all your pickle files and logging info
-dataset_filesfolder: "/data/shared/Control_ICL/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges_zero_dyn" #Folder that stores all your pickle files and logging info
+dataset_filesfolder: "/data/esmith/Dataset_Cartpole_AIGymWithNoise_ICL_new_ranges_zero_dyn" #Folder that stores all your pickle files and logging info
 pickle_folder: "picklefolder"  # Subfolder of dataset_filesfolder that will have all your trainingpkl files
 pickle_folder_test: "picklefolder_test_indistr"  # Subfolder of dataset_filesfolder that will have all your test pkl files
 pickle_folder_test_outofdistr: "picklefolder_test_outofdistr"  # Subfolder of dataset_filesfolder that will have all your test pkl files

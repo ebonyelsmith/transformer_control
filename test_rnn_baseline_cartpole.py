@@ -23,14 +23,14 @@ import importlib.util
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
-plot_label = 'mse_control'
+plot_label = 'rnn_zerodyn' #'mse_control'
 phase_plot_label = 'mse_control_phaseplot'
 mse_plot_label = 'mse_control_mseplot'
 save_results = "trainsteps_test_mse_control.txt"
 save_phase_plot = "trainsteps_test_mse_control.txt"
 log_info = "trainsteps_log_mse_control.txt"
 model_name= "cartpole_rnn"
-model_run_id= "three_layer_lstm_v4_h1024_e256_dropout0.2" 
+model_run_id= "bf5733fe-98c0-4c2d-aa18-2701b723de57" #"three_layer_lstm_v4_h1024_e256_dropout0.2" 
 
 model_config = {'n_dims': {'state': 5, 'distance': 1, 'mode': 3,'control': 1},
                 'hidden_size': 1024,

@@ -787,19 +787,22 @@ class RNNModel(nn.Module):
                             hidden_size=hidden_size,
                             num_layers=num_layers,
                             batch_first=True,
-                            dropout=0.2)
+                            # dropout=0.2)
+                            dropout=0.0)
         elif cell_type == 'gru':
             self.rnn = nn.GRU(input_size=n_embd, 
                             hidden_size=hidden_size,
                             num_layers=num_layers,
                             batch_first=True,
-                            dropout=0.2)
+                            # dropout=0.2)
+                            dropout=0.0)
         elif cell_type == 'lstm':
             self.rnn = nn.LSTM(input_size=n_embd, 
                             hidden_size=hidden_size,
                             num_layers=num_layers,
                             batch_first=True,
-                            dropout=0.2)
+                            # dropout=0.2)
+                            dropout=0.0)
 
         # --- 3/27/26 12pm: See changes below to state prediction
         # self.head_s = nn.Linear(hidden_size + n_dims['control'], n_dims['state'])
